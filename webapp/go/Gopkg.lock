@@ -92,7 +92,7 @@
   branch = "master"
   name = "github.com/serinuntius/graqt"
   packages = ["."]
-  revision = "b07faa5ddb31c49a64bbc45a0ecd125640984275"
+  revision = "c90def27b7dc38a26d548638e37e91fe6a242afa"
 
 [[projects]]
   name = "github.com/shogo82148/go-sql-proxy"
@@ -108,8 +108,8 @@
 [[projects]]
   name = "go.uber.org/atomic"
   packages = ["."]
-  revision = "4e336646b2ef9fc6e47be8e21594178f98e5ebcf"
-  version = "v1.2.0"
+  revision = "1ea20fb1cbb1cc08cbd0d913a96dead89aa18289"
+  version = "v1.3.2"
 
 [[projects]]
   name = "go.uber.org/multierr"
