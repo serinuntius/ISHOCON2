@@ -10,6 +10,7 @@ type Candidate struct {
 	Name           string
 	PoliticalParty string
 	Sex            string
+	VoteCount      int
 }
 
 // CandidateElectionResult type
@@ -36,7 +37,7 @@ func getAllCandidate(ctx context.Context) (candidates []Candidate) {
 
 	for rows.Next() {
 		c := Candidate{}
-		err = rows.Scan(&c.ID, &c.Name, &c.PoliticalParty, &c.Sex)
+		err = rows.Scan(&c.ID, &c.Name, &c.PoliticalParty, &c.Sex, &c.VoteCount)
 		if err != nil {
 			panic(err.Error())
 		}
@@ -48,14 +49,14 @@ func getAllCandidate(ctx context.Context) (candidates []Candidate) {
 
 func getCandidate(ctx context.Context, candidateID int) (c Candidate, err error) {
 	row := db.QueryRowContext(ctx, "SELECT * FROM candidates WHERE id = ?", candidateID)
-	err = row.Scan(&c.ID, &c.Name, &c.PoliticalParty, &c.Sex)
+	err = row.Scan(&c.ID, &c.Name, &c.PoliticalParty, &c.Sex, &c.VoteCount)
 
 	return
 }
 
 func getCandidateByName(ctx context.Context, name string) (c Candidate, err error) {
 	row := db.QueryRowContext(ctx, "SELECT * FROM candidates WHERE name = ?", name)
-	err = row.Scan(&c.ID, &c.Name, &c.PoliticalParty, &c.Sex)
+	err = row.Scan(&c.ID, &c.Name, &c.PoliticalParty, &c.Sex, &c.VoteCount)
 	return
 }
 
@@ -87,7 +88,7 @@ func getCandidatesByPoliticalParty(ctx context.Context, party string) (candidate
 
 	for rows.Next() {
 		c := Candidate{}
-		err = rows.Scan(&c.ID, &c.Name, &c.PoliticalParty, &c.Sex)
+		err = rows.Scan(&c.ID, &c.Name, &c.PoliticalParty, &c.Sex, &c.VoteCount)
 		if err != nil {
 			panic(err.Error())
 		}
@@ -99,9 +100,9 @@ func getCandidatesByPoliticalParty(ctx context.Context, party string) (candidate
 
 func getElectionResult(ctx context.Context) (result []CandidateElectionResult) {
 	rows, err := db.QueryContext(ctx, `
-		SELECT c.id, c.name, c.political_party, c.sex, IFNULL(v.count, 0)
+		SELECT c.id, c.name, c.political_party, c.sex, v.count
 		FROM candidates AS c
-		LEFT OUTER JOIN
+		JOIN
 	  	(SELECT candidate_id, COUNT(*) AS count
 	  	FROM votes
 	  	GROUP BY candidate_id) AS v

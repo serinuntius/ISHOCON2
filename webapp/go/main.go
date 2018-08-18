@@ -1,24 +1,27 @@
 package main
 
 import (
-	"database/sql"
 	"net/http"
 	"os"
 	"sort"
 	"strconv"
 
+	"database/sql"
+	"html/template"
+	"log"
+
 	"github.com/gin-gonic/contrib/sessions"
 	"github.com/gin-gonic/gin"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/serinuntius/graqt"
-	"html/template"
 )
 
 var (
 	db           *sql.DB
 	traceEnabled = os.Getenv("GRAQT_TRACE")
 	driverName   = "mysql"
-	candidates []Candidate
+	candidates   []Candidate
+	partyNames   []string
 )
 
 func getEnv(key, fallback string) string {
@@ -40,7 +43,12 @@ func main() {
 	user := getEnv("ISHOCON2_DB_USER", "ishocon")
 	pass := getEnv("ISHOCON2_DB_PASSWORD", "ishocon")
 	dbname := getEnv("ISHOCON2_DB_NAME", "ishocon2")
-	db, _ = sql.Open(driverName, user+":"+pass+"@/"+dbname)
+	var err error
+	db, err = sql.Open(driverName, user+":"+pass+"@/"+dbname)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	db.SetMaxIdleConns(5)
 
 	gin.SetMode(gin.DebugMode)
@@ -72,7 +80,6 @@ func main() {
 		candidates := tmp[:10]
 		candidates = append(candidates, tmp[len(tmp)-1])
 
-		partyNames := getAllPartyName(c)
 		partyResultMap := map[string]int{}
 		for _, name := range partyNames {
 			partyResultMap[name] = 0
@@ -163,40 +170,66 @@ func main() {
 
 	// POST /vote
 	r.POST("/vote", func(c *gin.Context) {
-		user, userErr := getUser(c, c.PostForm("name"), c.PostForm("address"), c.PostForm("mynumber"))
+		if c.PostForm("candidate") == "" {
+			voteError(c, "候補者を記入してください")
+			return
+		} else if c.PostForm("keyword") == "" {
+			voteError(c, "投票理由を記入してください")
+			return
+		}
+
 		candidate, cndErr := getCandidateByName(c, c.PostForm("candidate"))
-		votedCount := getUserVotedCount(c, user.ID)
+		if cndErr != nil {
+			voteError(c, "候補者を正しく記入してください")
+			return
+		}
+
+		user, userErr := getUser(c, c.PostForm("name"), c.PostForm("address"), c.PostForm("mynumber"))
+		if userErr != nil {
+			voteError(c, "個人情報に誤りがあります")
+			return
+		}
+
 		voteCount, _ := strconv.Atoi(c.PostForm("vote_count"))
 
-		var message string
-		if userErr != nil {
-			message = "個人情報に誤りがあります"
-		} else if user.Votes < voteCount+votedCount {
-			message = "投票数が上限を超えています"
-		} else if c.PostForm("candidate") == "" {
-			message = "候補者を記入してください"
-		} else if cndErr != nil {
-			message = "候補者を正しく記入してください"
-		} else if c.PostForm("keyword") == "" {
-			message = "投票理由を記入してください"
-		} else {
-			for i := 1; i <= voteCount; i++ {
-				createVote(c, user.ID, candidate.ID, c.PostForm("keyword"))
-			}
-			message = "投票に成功しました"
+		if user.Votes < voteCount+user.VotedCount {
+			voteError(c, "投票数が上限を超えています")
+			return
 		}
+
+		//for i := 1; i <= voteCount; i++ {
+		createVote(c, user.ID, candidate.ID, c.PostForm("keyword"), voteCount)
+		//}
+
 		c.HTML(http.StatusOK, "vote.tmpl", gin.H{
 			"candidates": candidates,
-			"message":    message,
+			"message":    "投票に成功しました",
 		})
 	})
 
 	r.GET("/initialize", func(c *gin.Context) {
 		db.Exec("DELETE FROM votes")
+		_, err := db.Exec("ALTER TABLE candidates ADD vote_count INTEGER default 0")
+		if err != nil {
+			log.Println(err)
+		}
+
+		_, err = db.Exec("ALTER TABLE users ADD voted_count INTEGER default 0")
+		if err != nil {
+			log.Println(err)
+		}
+
 		candidates = getAllCandidate(c)
+		partyNames = getAllPartyName(c)
 
 		c.String(http.StatusOK, "Finish")
 	})
 
 	r.Run(":8080")
+}
+
+func voteError(c *gin.Context, msg string) {
+	c.HTML(http.StatusOK, "vote.tmpl", gin.H{
+		"message": msg,
+	})
 }
