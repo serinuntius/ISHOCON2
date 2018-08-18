@@ -75,10 +75,10 @@ RUN cd /home/ishocon/webapp/php && \
     sudo php composer-setup.php && \
     sudo php -r "unlink('composer-setup.php');" && \
     sudo php ./composer.phar install
-RUN cd /home/ishocon/webapp/nodejs && \
-    sudo npm install
-RUN cd /home/ishocon/webapp/crystal && \
-    shards install
+#RUN cd /home/ishocon/webapp/nodejs && \
+#    sudo npm install
+#RUN cd /home/ishocon/webapp/crystal && \
+#    shards install
 
 COPY docker/start_app.sh /docker/start_app.sh
 
