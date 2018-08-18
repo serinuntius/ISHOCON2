@@ -7,9 +7,10 @@ services:
 #    image: showwin/ishocon2_app:latest
     command: /docker/start_app.sh
     volumes:
-      - storage_app:/var/lib/mysql
+#      - storage_app:/var/lib/mysql
       - ./webapp:/home/ishocon/webapp
       - ./admin/config/nginx.conf:/etc/nginx/nginx.conf
+      - ./admin/config/my.cnf:/etc/my.cnf
     ports:
       - "443:443"
 

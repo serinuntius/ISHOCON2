@@ -25,13 +25,16 @@ func createVote(ctx context.Context, userID int, candidateID int, keyword string
 
 	vote := Vote{}
 
-	row := db.QueryRowContext(ctx, "SELECT keyword, voted_count FROM votes WHERE keyword = ?", keyword)
-	err = row.Scan(&vote.Keyword, &vote.VotedCount)
+	row := db.QueryRowContext(ctx, "SELECT id, keyword, voted_count FROM votes WHERE keyword = ? AND user_id = ? AND candidate_id = ? FOR UPDATE", keyword, userID, candidateID)
+	err = row.Scan(&vote.ID, &vote.Keyword, &vote.VotedCount)
 	if err != nil && err != sql.ErrNoRows {
 		log.Fatal(err)
 	} else if err == sql.ErrNoRows {
 		// no row => insert
-		tx.ExecContext(ctx, "INSERT INTO votes (user_id, candidate_id, keyword, voted_count) VALUES", userID, candidateID, keyword, 1)
+		_, err := tx.ExecContext(ctx, "INSERT INTO votes (user_id, candidate_id, keyword, voted_count) VALUES (?, ?, ?, ?)", userID, candidateID, keyword, voteCount)
+		if err != nil {
+			log.Fatal(err)
+		}
 	} else {
 		// update
 		if _, err := tx.ExecContext(ctx,
@@ -65,7 +68,7 @@ func getVoiceOfSupporter(ctx context.Context, candidateIDs []int) (voices []stri
 		args = append(args, candidateID)
 	}
 	rows, err := db.QueryContext(ctx, `
-    SELECT keyword
+    SELECT DISTINCT keyword
     FROM votes
     WHERE candidate_id IN (`+ strings.Join(strings.Split(strings.Repeat("?", len(candidateIDs)), ""), ",")+ `)
     ORDER BY voted_count DESC

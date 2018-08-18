@@ -234,41 +234,6 @@ func main() {
 	r.GET("/initialize", func(c *gin.Context) {
 		db.Exec("DELETE FROM votes")
 
-		if false {
-			_, err := db.Exec("ALTER TABLE candidates ADD voted_count INTEGER default 0")
-			if err != nil {
-				log.Println(err)
-			}
-
-			_, err = db.Exec("ALTER TABLE users ADD voted_count INTEGER default 0")
-			if err != nil {
-				log.Println(err)
-			}
-
-			_, err = db.Exec("ALTER TABLE votes ADD voted_count INTEGER default 0")
-			if err != nil {
-				log.Println(err)
-			}
-
-			//ALTER TABLE votes change keyword  keyword varchar(191);
-			_, err = db.Exec("ALTER TABLE votes change keyword keyword varchar(191)")
-			if err != nil {
-				log.Println(err)
-			}
-
-			// ALTER TABLE votes drop INDEX user_id
-
-			_, err = db.Exec("ALTER TABLE votes ADD INDEX candidate_id_voted_count_idx(candidate_id,voted_count DESC)")
-			if err != nil {
-				log.Println(err)
-			}
-
-			_, err = db.Exec("ALTER TABLE votes ADD INDEX keyword_idx(keyword)")
-			if err != nil {
-				log.Println(err)
-			}
-		}
-
 		candidates = getAllCandidate(c)
 		partyNames = getAllPartyName(c)
 
