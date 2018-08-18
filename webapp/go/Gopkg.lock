@@ -92,7 +92,7 @@
   branch = "master"
   name = "github.com/serinuntius/graqt"
   packages = ["."]
-  revision = "c90def27b7dc38a26d548638e37e91fe6a242afa"
+  revision = "3fe10c9a3a8074dae6f54889bc6c2b19b9897d70"
 
 [[projects]]
   name = "github.com/shogo82148/go-sql-proxy"
@@ -112,12 +112,6 @@
   version = "v1.3.2"
 
 [[projects]]
-  name = "go.uber.org/multierr"
-  packages = ["."]
-  revision = "3c4937480c32f4c13a875a1829af76c98ca3d40a"
-  version = "v1.1.0"
-
-[[projects]]
   name = "go.uber.org/zap"
   packages = [
     ".",
@@ -125,10 +119,11 @@
     "internal/bufferpool",
     "internal/color",
     "internal/exit",
+    "internal/multierror",
     "zapcore"
   ]
-  revision = "ff33455a0e382e8a81d14dd7c922020b6b5e7982"
-  version = "v1.9.1"
+  revision = "9cabc84638b70e564c3dab2766efcb1ded2aac9f"
+  version = "v1.4.1"
 
 [[projects]]
   branch = "master"
