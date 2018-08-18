@@ -12,9 +12,14 @@ import (
 	"github.com/gin-gonic/contrib/static"
 	"github.com/gin-gonic/gin"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/serinuntius/graqt"
 )
 
-var db *sql.DB
+var (
+	db           *sql.DB
+	traceEnabled = os.Getenv("GRAQT_TRACE")
+	driverName   = "mysql"
+)
 
 func getEnv(key, fallback string) string {
 	if value, ok := os.LookupEnv(key); ok {
@@ -24,16 +29,29 @@ func getEnv(key, fallback string) string {
 }
 
 func main() {
+	if traceEnabled == "1" {
+		// driverNameは絶対にこれでお願いします。
+		driverName = "mysql-tracer"
+		graqt.SetRequestLogger("log/request.log")
+		graqt.SetQueryLogger("log/query.log")
+	}
+
 	// database setting
 	user := getEnv("ISHOCON2_DB_USER", "ishocon")
 	pass := getEnv("ISHOCON2_DB_PASSWORD", "ishocon")
 	dbname := getEnv("ISHOCON2_DB_NAME", "ishocon2")
-	db, _ = sql.Open("mysql", user+":"+pass+"@/"+dbname)
+	db, _ = sql.Open(driverName, user+":"+pass+"@/"+dbname)
 	db.SetMaxIdleConns(5)
 
-	gin.SetMode(gin.DebugMode)
+	//gin.SetMode(gin.DebugMode)
+	gin.SetMode(gin.ReleaseMode)
+
 	r := gin.Default()
 	r.Use(static.Serve("/css", static.LocalFile("public/css", true)))
+	if traceEnabled == "1" {
+		r.Use(graqt.RequestIdForGin())
+	}
+
 	layout := "templates/layout.tmpl"
 
 	// session store
@@ -43,7 +61,7 @@ func main() {
 
 	// GET /
 	r.GET("/", func(c *gin.Context) {
-		electionResults := getElectionResult()
+		electionResults := getElectionResult(c)
 
 		// 上位10人と最下位のみ表示
 		tmp := make([]CandidateElectionResult, len(electionResults))
@@ -51,7 +69,7 @@ func main() {
 		candidates := tmp[:10]
 		candidates = append(candidates, tmp[len(tmp)-1])
 
-		partyNames := getAllPartyName()
+		partyNames := getAllPartyName(c)
 		partyResultMap := map[string]int{}
 		for _, name := range partyNames {
 			partyResultMap[name] = 0
@@ -93,13 +111,13 @@ func main() {
 	// GET /candidates/:candidateID(int)
 	r.GET("/candidates/:candidateID", func(c *gin.Context) {
 		candidateID, _ := strconv.Atoi(c.Param("candidateID"))
-		candidate, err := getCandidate(candidateID)
+		candidate, err := getCandidate(c, candidateID)
 		if err != nil {
 			c.Redirect(http.StatusFound, "/")
 		}
-		votes := getVoteCountByCandidateID(candidateID)
+		votes := getVoteCountByCandidateID(c, candidateID)
 		candidateIDs := []int{candidateID}
-		keywords := getVoiceOfSupporter(candidateIDs)
+		keywords := getVoiceOfSupporter(c, candidateIDs)
 
 		r.SetHTMLTemplate(template.Must(template.ParseFiles(layout, "templates/candidate.tmpl")))
 		c.HTML(http.StatusOK, "base", gin.H{
@@ -113,19 +131,19 @@ func main() {
 	r.GET("/political_parties/:name", func(c *gin.Context) {
 		partyName := c.Param("name")
 		var votes int
-		electionResults := getElectionResult()
+		electionResults := getElectionResult(c)
 		for _, r := range electionResults {
 			if r.PoliticalParty == partyName {
 				votes += r.VoteCount
 			}
 		}
 
-		candidates := getCandidatesByPoliticalParty(partyName)
+		candidates := getCandidatesByPoliticalParty(c, partyName)
 		candidateIDs := []int{}
 		for _, c := range candidates {
 			candidateIDs = append(candidateIDs, c.ID)
 		}
-		keywords := getVoiceOfSupporter(candidateIDs)
+		keywords := getVoiceOfSupporter(c, candidateIDs)
 
 		r.SetHTMLTemplate(template.Must(template.ParseFiles(layout, "templates/political_party.tmpl")))
 		c.HTML(http.StatusOK, "base", gin.H{
@@ -138,7 +156,7 @@ func main() {
 
 	// GET /vote
 	r.GET("/vote", func(c *gin.Context) {
-		candidates := getAllCandidate()
+		candidates := getAllCandidate(c)
 
 		r.SetHTMLTemplate(template.Must(template.ParseFiles(layout, "templates/vote.tmpl")))
 		c.HTML(http.StatusOK, "base", gin.H{
@@ -149,10 +167,10 @@ func main() {
 
 	// POST /vote
 	r.POST("/vote", func(c *gin.Context) {
-		user, userErr := getUser(c.PostForm("name"), c.PostForm("address"), c.PostForm("mynumber"))
-		candidate, cndErr := getCandidateByName(c.PostForm("candidate"))
-		votedCount := getUserVotedCount(user.ID)
-		candidates := getAllCandidate()
+		user, userErr := getUser(c, c.PostForm("name"), c.PostForm("address"), c.PostForm("mynumber"))
+		candidate, cndErr := getCandidateByName(c, c.PostForm("candidate"))
+		votedCount := getUserVotedCount(c, user.ID)
+		candidates := getAllCandidate(c)
 		voteCount, _ := strconv.Atoi(c.PostForm("vote_count"))
 
 		var message string
@@ -169,7 +187,7 @@ func main() {
 			message = "投票理由を記入してください"
 		} else {
 			for i := 1; i <= voteCount; i++ {
-				createVote(user.ID, candidate.ID, c.PostForm("keyword"))
+				createVote(c, user.ID, candidate.ID, c.PostForm("keyword"))
 			}
 			message = "投票に成功しました"
 		}
