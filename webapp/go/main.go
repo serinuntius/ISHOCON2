@@ -18,6 +18,7 @@ var (
 	db           *sql.DB
 	traceEnabled = os.Getenv("GRAQT_TRACE")
 	driverName   = "mysql"
+	candidates []Candidate
 )
 
 func getEnv(key, fallback string) string {
@@ -154,8 +155,6 @@ func main() {
 
 	// GET /vote
 	r.GET("/vote", func(c *gin.Context) {
-		candidates := getAllCandidate(c)
-
 		c.HTML(http.StatusOK, "vote.tmpl", gin.H{
 			"candidates": candidates,
 			"message":    "",
@@ -167,7 +166,6 @@ func main() {
 		user, userErr := getUser(c, c.PostForm("name"), c.PostForm("address"), c.PostForm("mynumber"))
 		candidate, cndErr := getCandidateByName(c, c.PostForm("candidate"))
 		votedCount := getUserVotedCount(c, user.ID)
-		candidates := getAllCandidate(c)
 		voteCount, _ := strconv.Atoi(c.PostForm("vote_count"))
 
 		var message string
@@ -195,6 +193,7 @@ func main() {
 
 	r.GET("/initialize", func(c *gin.Context) {
 		db.Exec("DELETE FROM votes")
+		candidates = getAllCandidate(c)
 
 		c.String(http.StatusOK, "Finish")
 	})
