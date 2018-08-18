@@ -10,7 +10,7 @@ type Candidate struct {
 	Name           string
 	PoliticalParty string
 	Sex            string
-	VoteCount      int
+	VotedCount      int
 }
 
 // CandidateElectionResult type
@@ -19,7 +19,7 @@ type CandidateElectionResult struct {
 	Name           string
 	PoliticalParty string
 	Sex            string
-	VoteCount      int
+	VotedCount      int
 }
 
 // PartyElectionResult type
@@ -37,7 +37,7 @@ func getAllCandidate(ctx context.Context) (candidates []Candidate) {
 
 	for rows.Next() {
 		c := Candidate{}
-		err = rows.Scan(&c.ID, &c.Name, &c.PoliticalParty, &c.Sex, &c.VoteCount)
+		err = rows.Scan(&c.ID, &c.Name, &c.PoliticalParty, &c.Sex, &c.VotedCount)
 		if err != nil {
 			panic(err.Error())
 		}
@@ -49,14 +49,14 @@ func getAllCandidate(ctx context.Context) (candidates []Candidate) {
 
 func getCandidate(ctx context.Context, candidateID int) (c Candidate, err error) {
 	row := db.QueryRowContext(ctx, "SELECT * FROM candidates WHERE id = ?", candidateID)
-	err = row.Scan(&c.ID, &c.Name, &c.PoliticalParty, &c.Sex, &c.VoteCount)
+	err = row.Scan(&c.ID, &c.Name, &c.PoliticalParty, &c.Sex, &c.VotedCount)
 
 	return
 }
 
 func getCandidateByName(ctx context.Context, name string) (c Candidate, err error) {
 	row := db.QueryRowContext(ctx, "SELECT * FROM candidates WHERE name = ?", name)
-	err = row.Scan(&c.ID, &c.Name, &c.PoliticalParty, &c.Sex, &c.VoteCount)
+	err = row.Scan(&c.ID, &c.Name, &c.PoliticalParty, &c.Sex, &c.VotedCount)
 	return
 }
 
@@ -88,7 +88,7 @@ func getCandidatesByPoliticalParty(ctx context.Context, party string) (candidate
 
 	for rows.Next() {
 		c := Candidate{}
-		err = rows.Scan(&c.ID, &c.Name, &c.PoliticalParty, &c.Sex, &c.VoteCount)
+		err = rows.Scan(&c.ID, &c.Name, &c.PoliticalParty, &c.Sex, &c.VotedCount)
 		if err != nil {
 			panic(err.Error())
 		}
@@ -100,14 +100,9 @@ func getCandidatesByPoliticalParty(ctx context.Context, party string) (candidate
 
 func getElectionResult(ctx context.Context) (result []CandidateElectionResult) {
 	rows, err := db.QueryContext(ctx, `
-		SELECT c.id, c.name, c.political_party, c.sex, v.count
+		SELECT c.id, c.name, c.political_party, c.sex, voted_count
 		FROM candidates AS c
-		JOIN
-	  	(SELECT candidate_id, COUNT(*) AS count
-	  	FROM votes
-	  	GROUP BY candidate_id) AS v
-		ON c.id = v.candidate_id
-		ORDER BY v.count DESC`)
+		ORDER BY voted_count DESC`)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -115,7 +110,7 @@ func getElectionResult(ctx context.Context) (result []CandidateElectionResult) {
 
 	for rows.Next() {
 		r := CandidateElectionResult{}
-		err = rows.Scan(&r.ID, &r.Name, &r.PoliticalParty, &r.Sex, &r.VoteCount)
+		err = rows.Scan(&r.ID, &r.Name, &r.PoliticalParty, &r.Sex, &r.VotedCount)
 		if err != nil {
 			panic(err.Error())
 		}

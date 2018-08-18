@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"database/sql"
 	"log"
 	"strings"
 )
@@ -13,18 +13,7 @@ type Vote struct {
 	UserID      int
 	CandidateID int
 	Keyword     string
-}
-
-func getVoteCountByCandidateID(ctx context.Context, candidateID int) (count int) {
-	row := db.QueryRowContext(ctx, "SELECT COUNT(*) AS count FROM votes WHERE candidate_id = ?", candidateID)
-	row.Scan(&count)
-	return
-}
-
-func getUserVotedCount(ctx context.Context, userID int) (count int) {
-	row := db.QueryRowContext(ctx, "SELECT COUNT(*) AS count FROM votes WHERE user_id = ?", userID)
-	row.Scan(&count)
-	return
+	VotedCount  int
 }
 
 func createVote(ctx context.Context, userID int, candidateID int, keyword string, voteCount int) {
@@ -34,29 +23,32 @@ func createVote(ctx context.Context, userID int, candidateID int, keyword string
 		return
 	}
 
-	valueStrings := make([]string, 0, voteCount)
-	valueArgs := make([]interface{}, 0, voteCount*3) // 3 is column number
-	for i := 0; i < voteCount; i++ {
-		valueStrings = append(valueStrings, "(?, ?, ?)")
-		valueArgs = append(valueArgs, userID)
-		valueArgs = append(valueArgs, candidateID)
-		valueArgs = append(valueArgs, keyword)
-	}
+	vote := Vote{}
 
-	stmt := fmt.Sprintf("INSERT INTO votes (user_id, candidate_id, keyword) VALUES %s",
-		strings.Join(valueStrings, ","))
-	if _, err := tx.ExecContext(ctx, stmt, valueArgs...); err != nil {
+	row := db.QueryRowContext(ctx, "SELECT keyword, voted_count FROM votes WHERE keyword = ?", keyword)
+	err = row.Scan(&vote.Keyword, &vote.VotedCount)
+	if err != nil && err != sql.ErrNoRows {
 		log.Fatal(err)
+	} else if err == sql.ErrNoRows {
+		// no row => insert
+		tx.ExecContext(ctx, "INSERT INTO votes (user_id, candidate_id, keyword, voted_count) VALUES", userID, candidateID, keyword, 1)
+	} else {
+		// update
+		if _, err := tx.ExecContext(ctx,
+			"UPDATE votes SET voted_count = ? WHERE id = ?",
+			vote.VotedCount+1, vote.ID); err != nil {
+			log.Fatal(err)
+		}
 	}
 
-	if tx.ExecContext(ctx,
+	if _, err := tx.ExecContext(ctx,
 		"UPDATE users SET voted_count = voted_count + ? WHERE id = ?",
 		voteCount, userID); err != nil {
 		log.Fatal(err)
 	}
 
-	if tx.ExecContext(ctx,
-		"UPDATE candidates SET vote_count = vote_count + ? WHERE id = ?",
+	if _, err := tx.ExecContext(ctx,
+		"UPDATE candidates SET voted_count = voted_count + ? WHERE id = ?",
 		voteCount, candidateID); err != nil {
 		log.Fatal(err)
 	}
@@ -76,8 +68,7 @@ func getVoiceOfSupporter(ctx context.Context, candidateIDs []int) (voices []stri
     SELECT keyword
     FROM votes
     WHERE candidate_id IN (`+ strings.Join(strings.Split(strings.Repeat("?", len(candidateIDs)), ""), ",")+ `)
-    GROUP BY keyword
-    ORDER BY COUNT(*) DESC
+    ORDER BY voted_count DESC
     LIMIT 10`, args...)
 	if err != nil {
 		return nil

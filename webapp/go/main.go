@@ -5,6 +5,7 @@ import (
 	"os"
 	"sort"
 	"strconv"
+	"sync"
 
 	"database/sql"
 	"html/template"
@@ -51,6 +52,30 @@ func main() {
 
 	db.SetMaxIdleConns(5)
 
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+
+		_, err = db.Exec("UPDATE candidates SET voted_count = 0")
+		if err != nil {
+			log.Println(err)
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		// ALTER TABLE users DROP voted_count;
+		// ALTER TABLE users ADD voted_count INTEGER default 0;
+
+		_, err = db.Exec("UPDATE users SET voted_count = 0")
+		if err != nil {
+			log.Println(err)
+		}
+	}()
+
+	wg.Wait()
+
 	gin.SetMode(gin.DebugMode)
 	//gin.SetMode(gin.ReleaseMode)
 
@@ -77,40 +102,39 @@ func main() {
 		// 上位10人と最下位のみ表示
 		tmp := make([]CandidateElectionResult, len(electionResults))
 		copy(tmp, electionResults)
-		candidates := tmp[:10]
-		candidates = append(candidates, tmp[len(tmp)-1])
+		cs := tmp[:10]
+		cs = append(cs, tmp[len(tmp)-1])
 
-		partyResultMap := map[string]int{}
-		for _, name := range partyNames {
-			partyResultMap[name] = 0
-		}
-		for _, r := range electionResults {
-			partyResultMap[r.PoliticalParty] += r.VoteCount
-		}
-		partyResults := []PartyElectionResult{}
-		for name, count := range partyResultMap {
-			r := PartyElectionResult{}
-			r.PoliticalParty = name
-			r.VoteCount = count
-			partyResults = append(partyResults, r)
-		}
-		// 投票数でソート
-		sort.Slice(partyResults, func(i, j int) bool { return partyResults[i].VoteCount > partyResults[j].VoteCount })
+		partyResultMap := make(map[string]int, len(cs))
 
 		sexRatio := map[string]int{
 			"men":   0,
 			"women": 0,
 		}
+
 		for _, r := range electionResults {
 			if r.Sex == "男" {
-				sexRatio["men"] += r.VoteCount
+				sexRatio["men"] += r.VotedCount
 			} else if r.Sex == "女" {
-				sexRatio["women"] += r.VoteCount
+				sexRatio["women"] += r.VotedCount
 			}
+			partyResultMap[r.PoliticalParty] += r.VotedCount
 		}
+		partyResults := make([]PartyElectionResult, len(partyResultMap))
+		idx := 0
+		for name, count := range partyResultMap {
+			r := PartyElectionResult{
+				PoliticalParty: name,
+				VoteCount:      count,
+			}
+			partyResults[idx] = r
+			idx++
+		}
+		// 投票数でソート
+		sort.Slice(partyResults, func(i, j int) bool { return partyResults[i].VoteCount > partyResults[j].VoteCount })
 
 		c.HTML(http.StatusOK, "index.tmpl", gin.H{
-			"candidates": candidates,
+			"candidates": cs,
 			"parties":    partyResults,
 			"sexRatio":   sexRatio,
 		})
@@ -123,13 +147,13 @@ func main() {
 		if err != nil {
 			c.Redirect(http.StatusFound, "/")
 		}
-		votes := getVoteCountByCandidateID(c, candidateID)
+
 		candidateIDs := []int{candidateID}
 		keywords := getVoiceOfSupporter(c, candidateIDs)
 
 		c.HTML(http.StatusOK, "candidate.tmpl", gin.H{
 			"candidate": candidate,
-			"votes":     votes,
+			"votes":     candidate.VotedCount,
 			"keywords":  keywords,
 		})
 	})
@@ -141,7 +165,7 @@ func main() {
 		electionResults := getElectionResult(c)
 		for _, r := range electionResults {
 			if r.PoliticalParty == partyName {
-				votes += r.VoteCount
+				votes += r.VotedCount
 			}
 		}
 
@@ -209,14 +233,40 @@ func main() {
 
 	r.GET("/initialize", func(c *gin.Context) {
 		db.Exec("DELETE FROM votes")
-		_, err := db.Exec("ALTER TABLE candidates ADD vote_count INTEGER default 0")
-		if err != nil {
-			log.Println(err)
-		}
 
-		_, err = db.Exec("ALTER TABLE users ADD voted_count INTEGER default 0")
-		if err != nil {
-			log.Println(err)
+		if false {
+			_, err := db.Exec("ALTER TABLE candidates ADD voted_count INTEGER default 0")
+			if err != nil {
+				log.Println(err)
+			}
+
+			_, err = db.Exec("ALTER TABLE users ADD voted_count INTEGER default 0")
+			if err != nil {
+				log.Println(err)
+			}
+
+			_, err = db.Exec("ALTER TABLE votes ADD voted_count INTEGER default 0")
+			if err != nil {
+				log.Println(err)
+			}
+
+			//ALTER TABLE votes change keyword  keyword varchar(191);
+			_, err = db.Exec("ALTER TABLE votes change keyword keyword varchar(191)")
+			if err != nil {
+				log.Println(err)
+			}
+
+			// ALTER TABLE votes drop INDEX user_id
+
+			_, err = db.Exec("ALTER TABLE votes ADD INDEX candidate_id_voted_count_idx(candidate_id,voted_count DESC)")
+			if err != nil {
+				log.Println(err)
+			}
+
+			_, err = db.Exec("ALTER TABLE votes ADD INDEX keyword_idx(keyword)")
+			if err != nil {
+				log.Println(err)
+			}
 		}
 
 		candidates = getAllCandidate(c)
