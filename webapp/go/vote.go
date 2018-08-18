@@ -1,6 +1,9 @@
 package main
 
-import "strings"
+import (
+	"strings"
+	"context"
+)
 
 // Vote Model
 type Vote struct {
@@ -10,32 +13,32 @@ type Vote struct {
 	Keyword     string
 }
 
-func getVoteCountByCandidateID(candidateID int) (count int) {
-	row := db.QueryRow("SELECT COUNT(*) AS count FROM votes WHERE candidate_id = ?", candidateID)
+func getVoteCountByCandidateID(ctx context.Context, candidateID int) (count int) {
+	row := db.QueryRowContext(ctx, "SELECT COUNT(*) AS count FROM votes WHERE candidate_id = ?", candidateID)
 	row.Scan(&count)
 	return
 }
 
-func getUserVotedCount(userID int) (count int) {
-	row := db.QueryRow("SELECT COUNT(*) AS count FROM votes WHERE user_id = ?", userID)
+func getUserVotedCount(ctx context.Context, userID int) (count int) {
+	row := db.QueryRowContext(ctx, "SELECT COUNT(*) AS count FROM votes WHERE user_id = ?", userID)
 	row.Scan(&count)
 	return
 }
 
-func createVote(userID int, candidateID int, keyword string) {
-	db.Exec("INSERT INTO votes (user_id, candidate_id, keyword) VALUES (?, ?, ?)",
+func createVote(ctx context.Context, userID int, candidateID int, keyword string) {
+	db.ExecContext(ctx, "INSERT INTO votes (user_id, candidate_id, keyword) VALUES (?, ?, ?)",
 		userID, candidateID, keyword)
 }
 
-func getVoiceOfSupporter(candidateIDs []int) (voices []string) {
+func getVoiceOfSupporter(ctx context.Context, candidateIDs []int) (voices []string) {
 	args := []interface{}{}
 	for _, candidateID := range candidateIDs {
 		args = append(args, candidateID)
 	}
-	rows, err := db.Query(`
+	rows, err := db.QueryContext(ctx, `
     SELECT keyword
     FROM votes
-    WHERE candidate_id IN (`+strings.Join(strings.Split(strings.Repeat("?", len(candidateIDs)), ""), ",")+`)
+    WHERE candidate_id IN (`+ strings.Join(strings.Split(strings.Repeat("?", len(candidateIDs)), ""), ",")+ `)
     GROUP BY keyword
     ORDER BY COUNT(*) DESC
     LIMIT 10`, args...)
