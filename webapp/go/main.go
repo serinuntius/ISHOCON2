@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strconv"
 	"sync"
+	"time"
 
 	"database/sql"
 	"html/template"
@@ -50,7 +51,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	db.SetMaxIdleConns(5)
+	db.SetMaxIdleConns(20)
+	db.SetMaxOpenConns(40)
+	db.SetConnMaxLifetime(300 * time.Second)
 
 	var wg sync.WaitGroup
 	wg.Add(2)
