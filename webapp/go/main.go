@@ -252,6 +252,7 @@ func main() {
 
 	r.GET("/initialize", func(c *gin.Context) {
 		db.Exec("DELETE FROM votes")
+		rc.FlushAll()
 
 		candidates = getAllCandidate(c)
 
