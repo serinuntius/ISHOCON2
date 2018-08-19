@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"sort"
+	"sync"
 
 	"github.com/go-redis/redis"
 )
@@ -29,22 +30,38 @@ func createVote(ctx context.Context, userID int, candidateID int, keyword string
 		return
 	}
 
-	if _, err := rc.ZIncrBy(zkey(candidateID), float64(voteCount), keyword).Result();
-		err != nil {
-		log.Fatal(err)
-	}
+	var wg sync.WaitGroup
 
-	if _, err := tx.ExecContext(ctx,
-		"UPDATE users SET voted_count = voted_count + ? WHERE id = ?",
-		voteCount, userID); err != nil {
-		log.Fatal(err)
-	}
+	wg.Add(3)
 
-	if _, err := tx.ExecContext(ctx,
-		"UPDATE candidates SET voted_count = voted_count + ? WHERE id = ?",
-		voteCount, candidateID); err != nil {
-		log.Fatal(err)
-	}
+	go func() {
+		defer wg.Done()
+		if _, err := rc.ZIncrBy(zkey(candidateID), float64(voteCount), keyword).Result();
+			err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+
+	go func() {
+		defer wg.Done()
+		if _, err := tx.ExecContext(ctx,
+			"UPDATE users SET voted_count = voted_count + ? WHERE id = ?",
+			voteCount, userID); err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		if _, err := tx.ExecContext(ctx,
+			"UPDATE candidates SET voted_count = voted_count + ? WHERE id = ?",
+			voteCount, candidateID); err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	wg.Wait()
 
 	if err := tx.Commit(); err != nil {
 		rerr := tx.Rollback()
