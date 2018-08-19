@@ -271,7 +271,7 @@ func main() {
 	})
 
 	r.RunUnix("/var/run/go/go.sock")
-	//r.Run(":8080")
+	r.Run(":8080")
 }
 
 func voteError(c *gin.Context, msg string) {
