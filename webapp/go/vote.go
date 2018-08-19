@@ -73,8 +73,8 @@ func getVoiceOfSupporter(ctx context.Context, candidateIDs []int) (voices []stri
 		SUM(voted_count) AS sum_vote
     FROM votes
     WHERE candidate_id IN (`+ strings.Join(strings.Split(strings.Repeat("?", len(candidateIDs)), ""), ",")+ `)
-	GROUP BY votes.keyword
-	ORDER BY voted_count DESC
+	GROUP BY keyword
+	ORDER BY sum_vote DESC
     LIMIT 10`, args...)
 	if err != nil {
 		log.Fatal(err)
