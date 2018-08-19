@@ -54,12 +54,6 @@ func getCandidate(ctx context.Context, candidateID int) (c Candidate, err error)
 	return
 }
 
-func getCandidateByName(ctx context.Context, name string) (c Candidate, err error) {
-	row := db.QueryRowContext(ctx, "SELECT * FROM candidates WHERE name = ?", name)
-	err = row.Scan(&c.ID, &c.Name, &c.PoliticalParty, &c.Sex, &c.VotedCount)
-	return
-}
-
 func getAllPartyName(ctx context.Context) (partyNames []string) {
 	rows, err := db.QueryContext(ctx, "SELECT political_party FROM candidates GROUP BY political_party")
 	if err != nil {
