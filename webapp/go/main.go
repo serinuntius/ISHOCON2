@@ -164,18 +164,14 @@ func main() {
 	// GET /political_parties/:name(string)
 	r.GET("/political_parties/:name", func(c *gin.Context) {
 		partyName := c.Param("name")
-		var votes int
-		electionResults := getElectionResult(c)
-		for _, r := range electionResults {
-			if r.PoliticalParty == partyName {
-				votes += r.VotedCount
-			}
-		}
 
 		candidates := getCandidatesByPoliticalParty(c, partyName)
 		candidateIDs := []int{}
+		var votes int
+
 		for _, c := range candidates {
 			candidateIDs = append(candidateIDs, c.ID)
+			votes += c.VotedCount
 		}
 		keywords := getVoiceOfSupporter(c, candidateIDs)
 
