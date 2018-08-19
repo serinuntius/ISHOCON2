@@ -68,19 +68,24 @@ func getVoiceOfSupporter(ctx context.Context, candidateIDs []int) (voices []stri
 		args = append(args, candidateID)
 	}
 	rows, err := db.QueryContext(ctx, `
-    SELECT DISTINCT keyword
+    SELECT
+		keyword,
+		SUM(voted_count) AS sum_vote
     FROM votes
     WHERE candidate_id IN (`+ strings.Join(strings.Split(strings.Repeat("?", len(candidateIDs)), ""), ",")+ `)
-    ORDER BY voted_count DESC
+	GROUP BY votes.keyword
+	ORDER BY voted_count DESC
     LIMIT 10`, args...)
 	if err != nil {
+		log.Fatal(err)
 		return nil
 	}
 
 	defer rows.Close()
 	for rows.Next() {
 		var keyword string
-		err = rows.Scan(&keyword)
+		var votedCount int
+		err = rows.Scan(&keyword, &votedCount)
 		if err != nil {
 			panic(err.Error())
 		}
