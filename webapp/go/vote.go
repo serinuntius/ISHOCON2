@@ -85,7 +85,10 @@ func getVoiceOfSupporter(candidateIDs []int) (voices []string) {
 			return results[i].Score > results[j].Score
 		})
 
-		for _, r := range results {
+		for idx, r := range results {
+			if idx == 10 {
+				break
+			}
 			keyword := r.Member
 			if k, ok := keyword.(string); ok {
 				voices = append(voices, k)
