@@ -239,7 +239,8 @@ func main() {
 		c.String(http.StatusOK, "Finish")
 	})
 
-	r.Run(":8080")
+	r.RunUnix("/var/run/go.sock")
+	//r.Run(":8080")
 }
 
 func voteError(c *gin.Context, msg string) {
