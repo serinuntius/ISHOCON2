@@ -5,3 +5,5 @@ ALTER TABLE votes change keyword keyword varchar(191);
 
 ALTER TABLE votes ADD INDEX candidate_id_voted_count_idx(candidate_id,voted_count DESC);
 ALTER TABLE votes ADD INDEX keyword_idx(keyword);
+
+ALTER TABLE candidates ADD INDEX political_party_idx(political_party);
