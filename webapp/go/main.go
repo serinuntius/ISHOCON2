@@ -12,6 +12,8 @@ import (
 	"html/template"
 	"log"
 
+	_ "net/http/pprof"
+
 	"github.com/gin-gonic/contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis"
