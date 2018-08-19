@@ -12,8 +12,7 @@ import (
 	"html/template"
 	"log"
 
-	_ "net/http/pprof"
-
+	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis"
@@ -108,6 +107,8 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 
 	r := gin.Default()
+
+	pprof.Register(r,"")
 
 	//r.Use(static.Serve("/css", static.LocalFile("public/css", true)))
 	if traceEnabled == "1" {

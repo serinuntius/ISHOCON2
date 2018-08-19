@@ -18,6 +18,12 @@
 
 [[projects]]
   branch = "master"
+  name = "github.com/gin-contrib/pprof"
+  packages = ["."]
+  revision = "0ed7ffb6a18989cba60c46dfad1fbcba65684750"
+
+[[projects]]
+  branch = "master"
   name = "github.com/gin-contrib/sse"
   packages = ["."]
   revision = "22d885f9ecc78bf4ee5d72b937e4bbcdc58e8cae"
@@ -169,6 +175,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "ec3032976fa2cb7ea5a7073c1d2b30956f40e3db3a6d464f965f276c4e94cde0"
+  inputs-digest = "9b6ade7ef793054c6f7c427e06a2535d3033a559f0b44b55ba4e100b0ce7847e"
   solver-name = "gps-cdcl"
   solver-version = 1
