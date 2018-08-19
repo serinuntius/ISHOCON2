@@ -42,7 +42,6 @@ func createVote(ctx context.Context, userID int, candidateID int, keyword string
 		}
 	}()
 
-
 	go func() {
 		defer wg.Done()
 		if _, err := tx.ExecContext(ctx,
@@ -85,18 +84,25 @@ func getVoiceOfSupporter(candidateIDs []int) (voices []string) {
 			return results[i].Score > results[j].Score
 		})
 
-		for idx, r := range results {
-			if idx == 10 {
+		keywordCounter := map[string]int{}
+
+		for _, r := range results {
+			if len(keywordCounter) == 10 {
 				break
 			}
 			keyword := r.Member
 			if k, ok := keyword.(string); ok {
-				voices = append(voices, k)
+				keywordCounter[k] += int(r.Score)
 			} else {
 				// string以外が入っていることはありえない
 				log.Fatal("string以外が入っていることはありえない(たぶん)")
 			}
 		}
+
+		for keyword := range keywordCounter {
+			voices = append(voices, keyword)
+		}
+
 	} else {
 		// idが1つのときは10返ってきたやつをそのまま返すで OK
 		for _, r := range results {
