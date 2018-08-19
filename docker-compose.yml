@@ -22,7 +22,7 @@ services:
   bench:
     build:
       context: .
-      dockerfile: /Dockerfile_bench
+      dockerfile: Dockerfile_bench
 #    image: showwin/ishocon2_bench:latest
     command: /docker/start_bench.sh
     volumes:
