@@ -14,12 +14,14 @@ import (
 
 	"github.com/gin-gonic/contrib/sessions"
 	"github.com/gin-gonic/gin"
+	"github.com/go-redis/redis"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/serinuntius/graqt"
 )
 
 var (
 	db           *sql.DB
+	rc           *redis.Client
 	traceEnabled = os.Getenv("GRAQT_TRACE")
 	driverName   = "mysql"
 	candidates   []Candidate
@@ -34,12 +36,31 @@ func getEnv(key, fallback string) string {
 	return fallback
 }
 
+func NewRedisClient() error {
+	rc = redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: "",
+		DB:       0,
+	})
+
+	_, err := rc.Ping().Result()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func main() {
 	if traceEnabled == "1" {
 		// driverNameは絶対にこれでお願いします。
 		driverName = "mysql-tracer"
 		graqt.SetRequestLogger("log/request.log")
 		graqt.SetQueryLogger("log/query.log")
+	}
+
+	// redis connect
+	if err := NewRedisClient(); err != nil {
+		log.Fatal(err)
 	}
 
 	// database setting
@@ -153,7 +174,7 @@ func main() {
 		}
 
 		candidateIDs := []int{candidateID}
-		keywords := getVoiceOfSupporter(c, candidateIDs)
+		keywords := getVoiceOfSupporter(candidateIDs)
 
 		c.HTML(http.StatusOK, "candidate.tmpl", gin.H{
 			"candidate": candidate,
@@ -174,7 +195,7 @@ func main() {
 			candidateIDs = append(candidateIDs, c.ID)
 			votes += c.VotedCount
 		}
-		keywords := getVoiceOfSupporter(c, candidateIDs)
+		keywords := getVoiceOfSupporter(candidateIDs)
 
 		c.HTML(http.StatusOK, "political_party.tmpl", gin.H{
 			"politicalParty": partyName,

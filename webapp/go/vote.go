@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
-	"database/sql"
+	"fmt"
 	"log"
-	"strings"
+	"sort"
+
+	"github.com/go-redis/redis"
 )
 
 // Vote Model
@@ -16,6 +18,10 @@ type Vote struct {
 	VotedCount  int
 }
 
+func zkey(candidateId int) string {
+	return fmt.Sprintf("candidates:%d", candidateId)
+}
+
 func createVote(ctx context.Context, userID int, candidateID int, keyword string, voteCount int) {
 	tx, err := db.Begin()
 	if err != nil {
@@ -23,25 +29,9 @@ func createVote(ctx context.Context, userID int, candidateID int, keyword string
 		return
 	}
 
-	vote := Vote{}
-
-	row := db.QueryRowContext(ctx, "SELECT id, keyword, voted_count FROM votes WHERE keyword = ? AND user_id = ? AND candidate_id = ? FOR UPDATE", keyword, userID, candidateID)
-	err = row.Scan(&vote.ID, &vote.Keyword, &vote.VotedCount)
-	if err != nil && err != sql.ErrNoRows {
+	if _, err := rc.ZIncrBy(zkey(candidateID), float64(voteCount), keyword).Result();
+		err != nil {
 		log.Fatal(err)
-	} else if err == sql.ErrNoRows {
-		// no row => insert
-		_, err := tx.ExecContext(ctx, "INSERT INTO votes (user_id, candidate_id, keyword, voted_count) VALUES (?, ?, ?, ?)", userID, candidateID, keyword, voteCount)
-		if err != nil {
-			log.Fatal(err)
-		}
-	} else {
-		// update
-		if _, err := tx.ExecContext(ctx,
-			"UPDATE votes SET voted_count = ? WHERE id = ?",
-			vote.VotedCount+1, vote.ID); err != nil {
-			log.Fatal(err)
-		}
 	}
 
 	if _, err := tx.ExecContext(ctx,
@@ -62,34 +52,43 @@ func createVote(ctx context.Context, userID int, candidateID int, keyword string
 	}
 }
 
-func getVoiceOfSupporter(ctx context.Context, candidateIDs []int) (voices []string) {
-	args := []interface{}{}
-	for _, candidateID := range candidateIDs {
-		args = append(args, candidateID)
-	}
-	rows, err := db.QueryContext(ctx, `
-    SELECT
-		keyword,
-		SUM(voted_count) AS sum_vote
-    FROM votes
-    WHERE candidate_id IN (`+ strings.Join(strings.Split(strings.Repeat("?", len(candidateIDs)), ""), ",")+ `)
-	GROUP BY keyword
-	ORDER BY sum_vote DESC
-    LIMIT 10`, args...)
-	if err != nil {
-		log.Fatal(err)
-		return nil
+func getVoiceOfSupporter(candidateIDs []int) (voices []string) {
+	var results []redis.Z
+	for _, cID := range candidateIDs {
+		keywords, err := rc.ZRevRangeWithScores(zkey(cID), 0, 9).Result()
+		if err != nil {
+			log.Fatal(err)
+		}
+		results = append(results, keywords...)
 	}
 
-	defer rows.Close()
-	for rows.Next() {
-		var keyword string
-		var votedCount int
-		err = rows.Scan(&keyword, &votedCount)
-		if err != nil {
-			panic(err.Error())
+	if len(candidateIDs) > 1 {
+		// 複数のときはいい感じにしてあげる必要がある
+		sort.Slice(results, func(i, j int) bool {
+			return results[i].Score > results[j].Score
+		})
+
+		for _, r := range results {
+			keyword := r.Member
+			if k, ok := keyword.(string); ok {
+				voices = append(voices, k)
+			} else {
+				// string以外が入っていることはありえない
+				log.Fatal("string以外が入っていることはありえない(たぶん)")
+			}
 		}
-		voices = append(voices, keyword)
+	} else {
+		// idが1つのときは10返ってきたやつをそのまま返すで OK
+		for _, r := range results {
+			keyword := r.Member
+			if k, ok := keyword.(string); ok {
+				voices = append(voices, k)
+			} else {
+				// string以外が入っていることはありえない
+				log.Fatal("string以外が入っていることはありえない(たぶん)")
+			}
+		}
 	}
+
 	return
 }
