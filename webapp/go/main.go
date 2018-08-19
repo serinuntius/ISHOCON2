@@ -239,7 +239,7 @@ func main() {
 		c.String(http.StatusOK, "Finish")
 	})
 
-	r.RunUnix("/var/run/go.sock")
+	r.RunUnix("/var/run/go/go.sock")
 	//r.Run(":8080")
 }
 
