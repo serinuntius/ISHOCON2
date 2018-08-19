@@ -38,7 +38,8 @@ func getEnv(key, fallback string) string {
 
 func NewRedisClient() error {
 	rc = redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
+		Network:  "unix",
+		Addr:     "/var/run/redis/redis-server.sock",
 		Password: "",
 		DB:       0,
 	})
