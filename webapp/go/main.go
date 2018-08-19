@@ -108,7 +108,7 @@ func main() {
 
 	r := gin.Default()
 
-	pprof.Register(r,"")
+	pprof.Register(r)
 
 	//r.Use(static.Serve("/css", static.LocalFile("public/css", true)))
 	if traceEnabled == "1" {
