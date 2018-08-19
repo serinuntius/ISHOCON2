@@ -46,7 +46,7 @@ func main() {
 	pass := getEnv("ISHOCON2_DB_PASSWORD", "ishocon")
 	dbname := getEnv("ISHOCON2_DB_NAME", "ishocon2")
 	var err error
-	db, err = sql.Open(driverName, user+":"+pass+"@/"+dbname)
+	db, err = sql.Open(driverName, user+":"+pass+"@unix(/var/run/mysqld/mysqld.sock)/"+dbname)
 	if err != nil {
 		log.Fatal(err)
 	}
