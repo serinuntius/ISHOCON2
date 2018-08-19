@@ -102,8 +102,8 @@ func main() {
 
 	wg.Wait()
 
-	gin.SetMode(gin.DebugMode)
-	//gin.SetMode(gin.ReleaseMode)
+	//gin.SetMode(gin.DebugMode)
+	gin.SetMode(gin.ReleaseMode)
 
 	r := gin.Default()
 
