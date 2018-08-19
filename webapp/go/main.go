@@ -24,6 +24,7 @@ var (
 	driverName   = "mysql"
 	candidates   []Candidate
 	partyNames   []string
+	candidateMap map[string]int
 )
 
 func getEnv(key, fallback string) string {
@@ -201,8 +202,8 @@ func main() {
 			return
 		}
 
-		candidate, cndErr := getCandidateByName(c, c.PostForm("candidate"))
-		if cndErr != nil {
+		candidateID, ok := candidateMap[c.PostForm("candidate")]
+		if !ok {
 			voteError(c, "候補者を正しく記入してください")
 			return
 		}
@@ -220,9 +221,7 @@ func main() {
 			return
 		}
 
-		//for i := 1; i <= voteCount; i++ {
-		createVote(c, user.ID, candidate.ID, c.PostForm("keyword"), voteCount)
-		//}
+		createVote(c, user.ID, candidateID, c.PostForm("keyword"), voteCount)
 
 		c.HTML(http.StatusOK, "vote.tmpl", gin.H{
 			"candidates": candidates,
@@ -234,6 +233,12 @@ func main() {
 		db.Exec("DELETE FROM votes")
 
 		candidates = getAllCandidate(c)
+
+		candidateMap = make(map[string]int, len(candidates))
+		for _, c := range candidates {
+			candidateMap[c.Name] = c.ID
+		}
+
 		partyNames = getAllPartyName(c)
 
 		c.String(http.StatusOK, "Finish")
