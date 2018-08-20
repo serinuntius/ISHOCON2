@@ -265,7 +265,12 @@ func main() {
 
 		voteCount, _ := strconv.Atoi(c.PostForm("vote_count"))
 
-		if user.Votes < voteCount+user.VotedCount {
+		userVotedCount, err := rc.Get(userKey(user.ID)).Int64()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if user.Votes < voteCount+int(userVotedCount) {
 			voteError(c, "投票数が上限を超えています")
 			return
 		}
