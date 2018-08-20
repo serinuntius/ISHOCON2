@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 )
 
@@ -41,7 +42,6 @@ func createVote(ctx context.Context, userID int, candidateID int, keyword string
 func getVoiceOfSupporter(candidateID int) (voices []string) {
 	politicalParty := candidateIdMap[candidateID].PoliticalParty
 
-
 	voices, err := rc.ZRevRange(politicalParty, 0, 10).Result()
 	if err != nil {
 		log.Fatal(err)
@@ -60,7 +60,7 @@ func getVoiceOfSupporterByParties(politicalParty string) (voices []string) {
 }
 
 func candidateVotedCountKey(candidateID int) string {
-	return "candidateVotedCount:" + string(candidateID)
+	return fmt.Sprintf("candidateVotedCount:%d", candidateID)
 }
 
 func candidateKey(candidateID int) string {
