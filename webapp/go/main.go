@@ -151,7 +151,7 @@ func main() {
 	}))
 
 	// GET /candidates/:candidateID(int)
-	r.GET("/candidates/:candidateID", func(c *gin.Context) {
+	r.GET("/candidates/:candidateID", cache.CachePage(store, time.Minute, func(c *gin.Context) {
 		candidateID, _ := strconv.Atoi(c.Param("candidateID"))
 		candidate, err := getCandidate(c, candidateID)
 		if err != nil {
@@ -166,10 +166,11 @@ func main() {
 			"votes":     candidate.VotedCount,
 			"keywords":  keywords,
 		})
-	})
+	}))
 
 	// GET /political_parties/:name(string)
-	r.GET("/political_parties/:name", func(c *gin.Context) {
+
+	r.GET("/political_parties/:name", cache.CachePage(store, time.Minute, func(c *gin.Context) {
 		partyName := c.Param("name")
 
 		candidates := getCandidatesByPoliticalParty(c, partyName)
@@ -188,7 +189,7 @@ func main() {
 			"candidates":     candidates,
 			"keywords":       keywords,
 		})
-	})
+	}))
 
 	// GET /vote
 	r.GET("/vote", func(c *gin.Context) {
