@@ -178,7 +178,7 @@ func main() {
 		}
 
 		candidateIDs := []int{candidateID}
-		keywords := getVoiceOfSupporter(candidateIDs)
+		keywords := getVoiceOfSupporter(c, candidateIDs)
 
 		c.HTML(http.StatusOK, "candidate.tmpl", gin.H{
 			"candidate": candidate,
@@ -199,7 +199,7 @@ func main() {
 			candidateIDs = append(candidateIDs, c.ID)
 			votes += c.VotedCount
 		}
-		keywords := getVoiceOfSupporter(candidateIDs)
+		keywords := getVoiceOfSupporter(c, candidateIDs)
 
 		c.HTML(http.StatusOK, "political_party.tmpl", gin.H{
 			"politicalParty": partyName,
