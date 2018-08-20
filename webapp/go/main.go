@@ -266,8 +266,10 @@ func main() {
 		voteCount, _ := strconv.Atoi(c.PostForm("vote_count"))
 
 		userVotedCount, err := rc.Get(userKey(user.ID)).Int64()
-		if err != nil {
+		if err != redis.Nil {
 			log.Fatal(err)
+		} else if err == redis.Nil {
+			userVotedCount = 0
 		}
 
 		if user.Votes < voteCount+int(userVotedCount) {
