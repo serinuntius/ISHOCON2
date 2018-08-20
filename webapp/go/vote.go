@@ -2,9 +2,7 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"log"
-	"strings"
 )
 
 // Vote Model
@@ -17,79 +15,62 @@ type Vote struct {
 }
 
 func createVote(ctx context.Context, userID int, candidateID int, keyword string, voteCount int) {
-	tx, err := db.Begin()
+	politicalParty := candidateIdMap[candidateID].PoliticalParty
+
+	_, err := rc.ZIncrBy(politicalParty, float64(voteCount), keyword).Result()
 	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	vote := Vote{}
-
-	row := db.QueryRowContext(ctx, "SELECT id, keyword, voted_count FROM votes WHERE keyword = ? AND user_id = ? AND candidate_id = ? FOR UPDATE", keyword, userID, candidateID)
-	err = row.Scan(&vote.ID, &vote.Keyword, &vote.VotedCount)
-	if err != nil && err != sql.ErrNoRows {
-		log.Fatal(err)
-	} else if err == sql.ErrNoRows {
-		// no row => insert
-		_, err := tx.ExecContext(ctx, "INSERT INTO votes (user_id, candidate_id, keyword, voted_count) VALUES (?, ?, ?, ?)", userID, candidateID, keyword, voteCount)
-		if err != nil {
-			log.Fatal(err)
-		}
-	} else {
-		// update
-		if _, err := tx.ExecContext(ctx,
-			"UPDATE votes SET voted_count = ? WHERE id = ?",
-			vote.VotedCount+1, vote.ID); err != nil {
-			log.Fatal(err)
-		}
-	}
-
-	if _, err := tx.ExecContext(ctx,
-		"UPDATE users SET voted_count = voted_count + ? WHERE id = ?",
-		voteCount, userID); err != nil {
 		log.Fatal(err)
 	}
 
-	if _, err := tx.ExecContext(ctx,
-		"UPDATE candidates SET voted_count = voted_count + ? WHERE id = ?",
-		voteCount, candidateID); err != nil {
+	_, err = rc.ZIncrBy(candidateKey(candidateID), float64(voteCount), keyword).Result()
+	if err != nil {
 		log.Fatal(err)
 	}
 
-	if err := tx.Commit(); err != nil {
-		rerr := tx.Rollback()
-		log.Fatal(rerr)
+	_, err = rc.ZIncrBy(kojinKey(), float64(voteCount), candidateVotedCountKey(candidateID)).Result()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	_, err = rc.IncrBy(userKey(userID), int64(voteCount)).Result()
+	if err != nil {
+		log.Fatal(err)
 	}
 }
 
-func getVoiceOfSupporter(ctx context.Context, candidateIDs []int) (voices []string) {
-	args := []interface{}{}
-	for _, candidateID := range candidateIDs {
-		args = append(args, candidateID)
-	}
-	rows, err := db.QueryContext(ctx, `
-    SELECT
-		keyword,
-		SUM(voted_count) AS sum_vote
-    FROM votes
-    WHERE candidate_id IN (`+ strings.Join(strings.Split(strings.Repeat("?", len(candidateIDs)), ""), ",")+ `)
-	GROUP BY keyword
-	ORDER BY sum_vote DESC
-    LIMIT 10`, args...)
+func getVoiceOfSupporter(candidateID int) (voices []string) {
+	politicalParty := candidateIdMap[candidateID].PoliticalParty
+
+
+	voices, err := rc.ZRevRange(politicalParty, 0, 10).Result()
 	if err != nil {
 		log.Fatal(err)
-		return nil
 	}
 
-	defer rows.Close()
-	for rows.Next() {
-		var keyword string
-		var votedCount int
-		err = rows.Scan(&keyword, &votedCount)
-		if err != nil {
-			panic(err.Error())
-		}
-		voices = append(voices, keyword)
-	}
 	return
+}
+
+func getVoiceOfSupporterByParties(politicalParty string) (voices []string) {
+	voices, err := rc.ZRevRange(politicalParty, 0, 10).Result()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return
+}
+
+func candidateVotedCountKey(candidateID int) string {
+	return "candidateVotedCount:" + string(candidateID)
+}
+
+func candidateKey(candidateID int) string {
+	return "candidate:" + string(candidateID)
+}
+
+func userKey(userID int) string {
+	return "user:" + string(userID)
+}
+
+func kojinKey() string {
+	return "kojinkey"
 }

@@ -5,7 +5,7 @@ import (
 	"os"
 	"sort"
 	"strconv"
-	"sync"
+	"strings"
 	"time"
 
 	"database/sql"
@@ -16,16 +16,20 @@ import (
 	"github.com/gin-contrib/cache/persistence"
 	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
+	"github.com/go-redis/redis"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/serinuntius/graqt"
 )
 
 var (
 	db           *sql.DB
+	rc           *redis.Client
 	traceEnabled = os.Getenv("GRAQT_TRACE")
 	driverName   = "mysql"
 	candidates   []Candidate
-	candidateMap map[string]int
+
+	candidateMap   map[string]int
+	candidateIdMap map[int]Candidate
 )
 
 func getEnv(key, fallback string) string {
@@ -33,6 +37,21 @@ func getEnv(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func NewRedisClient() error {
+	rc = redis.NewClient(&redis.Options{
+		Network:  "unix",
+		Addr:     "/var/run/redis/redis-server.sock",
+		Password: "",
+		DB:       0,
+	})
+
+	_, err := rc.Ping().Result()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func main() {
@@ -53,33 +72,13 @@ func main() {
 		log.Fatal(err)
 	}
 
+	if err := NewRedisClient(); err != nil {
+		log.Fatal(err)
+	}
+
 	db.SetMaxIdleConns(20)
 	db.SetMaxOpenConns(40)
 	db.SetConnMaxLifetime(300 * time.Second)
-
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
-
-		_, err = db.Exec("UPDATE candidates SET voted_count = 0")
-		if err != nil {
-			log.Println(err)
-		}
-	}()
-
-	go func() {
-		defer wg.Done()
-		// ALTER TABLE users DROP voted_count;
-		// ALTER TABLE users ADD voted_count INTEGER default 0;
-
-		_, err = db.Exec("UPDATE users SET voted_count = 0")
-		if err != nil {
-			log.Println(err)
-		}
-	}()
-
-	wg.Wait()
 
 	gin.SetMode(gin.DebugMode)
 	//gin.SetMode(gin.ReleaseMode)
@@ -107,29 +106,64 @@ func main() {
 
 	// GET /
 	r.GET("/", cache.CachePage(store, time.Minute, func(c *gin.Context) {
-		electionResults := getElectionResult(c)
+		// 1 ~ 10 の取得
+		results, err := rc.ZRevRangeWithScores(kojinKey(), 0, 10).Result()
+		if err != nil {
+			log.Fatal(err)
+		}
 
-		// 上位10人と最下位のみ表示
-		tmp := make([]CandidateElectionResult, len(electionResults))
-		copy(tmp, electionResults)
-		cs := tmp[:10]
-		cs = append(cs, tmp[len(tmp)-1])
+		// 最下位
+		resultsWorst, err := rc.ZRangeWithScores(kojinKey(), 0, 0).Result()
+		results = append(results, resultsWorst...)
 
-		partyResultMap := make(map[string]int, len(cs))
+		// 1 ~ 10と最下位の分枠を用意しておく
+		candidateIDs := make([]int, len(results))
+		votedCounts := make([]int, len(results))
+
+		for i, r := range results {
+			candidateVotedCountKey, votedCount := r.Member, r.Score
+			if cKey, ok := candidateVotedCountKey.(string); ok {
+				idx := strings.Index(cKey, ":")
+				candidateID := cKey[idx+1:]
+				candidateIDs[i], err = strconv.Atoi(candidateID)
+				if err != nil {
+					log.Fatal(err)
+				}
+				votedCounts[i] = int(votedCount)
+			} else {
+				log.Fatal(candidateVotedCountKey)
+			}
+		}
 
 		sexRatio := map[string]int{
 			"men":   0,
 			"women": 0,
 		}
 
-		for _, r := range electionResults {
-			if r.Sex == "男" {
-				sexRatio["men"] += r.VotedCount
-			} else if r.Sex == "女" {
-				sexRatio["women"] += r.VotedCount
+		//partyElectionResults := [4]PartyElectionResult{}
+		partyResultMap := make(map[string]int, 4)
+
+		var cs []CandidateElectionResult
+
+		for idx, cID := range candidateIDs {
+			sex := candidateIdMap[cID].Sex
+			partyName := candidateIdMap[cID].PoliticalParty
+
+			if sex == "男" {
+				sexRatio["men"] += votedCounts[idx]
+			} else {
+				sexRatio["women"] += votedCounts[idx]
 			}
-			partyResultMap[r.PoliticalParty] += r.VotedCount
+
+			cs = append(cs, CandidateElectionResult{
+				ID:             cID,
+				Name:           candidateIdMap[cID].Name,
+				PoliticalParty: partyName,
+				Sex:            sex,
+			})
+			partyResultMap[partyName] += votedCounts[idx]
 		}
+
 		partyResults := make([]PartyElectionResult, len(partyResultMap))
 		idx := 0
 		for name, count := range partyResultMap {
@@ -140,6 +174,7 @@ func main() {
 			partyResults[idx] = r
 			idx++
 		}
+
 		// 投票数でソート
 		sort.Slice(partyResults, func(i, j int) bool { return partyResults[i].VoteCount > partyResults[j].VoteCount })
 
@@ -158,12 +193,15 @@ func main() {
 			c.Redirect(http.StatusFound, "/")
 		}
 
-		candidateIDs := []int{candidateID}
-		keywords := getVoiceOfSupporter(c, candidateIDs)
+		keywords := getVoiceOfSupporter(candidateID)
+		votedCount, err := rc.Get(candidateVotedCountKey(candidateID)).Int64()
+		if err != nil {
+			log.Fatal(err)
+		}
 
 		c.HTML(http.StatusOK, "candidate.tmpl", gin.H{
 			"candidate": candidate,
-			"votes":     candidate.VotedCount,
+			"votes":     votedCount,
 			"keywords":  keywords,
 		})
 	}))
@@ -174,14 +212,17 @@ func main() {
 		partyName := c.Param("name")
 
 		candidates := getCandidatesByPoliticalParty(c, partyName)
-		candidateIDs := []int{}
 		var votes int
 
 		for _, c := range candidates {
-			candidateIDs = append(candidateIDs, c.ID)
-			votes += c.VotedCount
+			votedCount, err := rc.Get(candidateVotedCountKey(c.ID)).Int64()
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			votes += int(votedCount)
 		}
-		keywords := getVoiceOfSupporter(c, candidateIDs)
+		keywords := getVoiceOfSupporterByParties(partyName)
 
 		c.HTML(http.StatusOK, "political_party.tmpl", gin.H{
 			"politicalParty": partyName,
@@ -241,11 +282,16 @@ func main() {
 	r.GET("/initialize", func(c *gin.Context) {
 		db.Exec("DELETE FROM votes")
 
+		rc.FlushAll()
+		store.Flush()
+
 		candidates = getAllCandidate(c)
 
 		candidateMap = make(map[string]int, len(candidates))
+		candidateIdMap = make(map[int]Candidate, len(candidates))
 		for _, c := range candidates {
 			candidateMap[c.Name] = c.ID
+			candidateIdMap[c.ID] = c
 		}
 
 		c.String(http.StatusOK, "Finish")

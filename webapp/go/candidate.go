@@ -54,25 +54,6 @@ func getCandidate(ctx context.Context, candidateID int) (c Candidate, err error)
 	return
 }
 
-func getAllPartyName(ctx context.Context) (partyNames []string) {
-	rows, err := db.QueryContext(ctx, "SELECT political_party FROM candidates GROUP BY political_party")
-	if err != nil {
-		panic(err.Error())
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var name string
-		err = rows.Scan(&name)
-		if err != nil {
-			panic(err.Error())
-		}
-		partyNames = append(partyNames, name)
-	}
-
-	return
-}
-
 func getCandidatesByPoliticalParty(ctx context.Context, party string) (candidates []Candidate) {
 	rows, err := db.QueryContext(ctx, "SELECT * FROM candidates WHERE political_party = ?", party)
 	if err != nil {
