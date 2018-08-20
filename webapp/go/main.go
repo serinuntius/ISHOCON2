@@ -160,6 +160,7 @@ func main() {
 				Name:           candidateIdMap[cID].Name,
 				PoliticalParty: partyName,
 				Sex:            sex,
+				VotedCount:     votedCounts[idx],
 			})
 			partyResultMap[partyName] += votedCounts[idx]
 		}
