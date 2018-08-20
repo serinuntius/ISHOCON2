@@ -107,7 +107,7 @@ func main() {
 	// GET /
 	r.GET("/", cache.CachePage(store, time.Minute, func(c *gin.Context) {
 		// 1 ~ 10 の取得
-		results, err := rc.ZRevRangeWithScores(kojinKey(), 0, 10).Result()
+		results, err := rc.ZRevRangeWithScores(kojinKey(), 0, 9).Result()
 		if err != nil {
 			log.Fatal(err)
 		}
