@@ -8,6 +8,12 @@
   version = "v1.2"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/bradfitz/gomemcache"
+  packages = ["memcache"]
+  revision = "bc664df9673713a0ccf26e3b55a673ec7301088b"
+
+[[projects]]
   name = "github.com/garyburd/redigo"
   packages = [
     "internal",
@@ -15,6 +21,16 @@
   ]
   revision = "a69d19351219b6dd56f274f96d85a7014a2ec34e"
   version = "v1.6.0"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/gin-contrib/cache"
+  packages = [
+    ".",
+    "persistence",
+    "utils"
+  ]
+  revision = "6b4ffed64d167edff23695c7bd60af88a6792120"
 
 [[projects]]
   branch = "master"
@@ -72,6 +88,15 @@
   revision = "5a0f697c9ed9d68fef0116532c6e05cfeae00e55"
 
 [[projects]]
+  name = "github.com/gomodule/redigo"
+  packages = [
+    "internal",
+    "redis"
+  ]
+  revision = "9c11da706d9b7902c6da69c592f75637793fe121"
+  version = "v2.0.0"
+
+[[projects]]
   name = "github.com/gorilla/context"
   packages = ["."]
   revision = "08b5f424b9271eedf6f9f0ce86cb9396ed337a42"
@@ -101,10 +126,22 @@
   revision = "57fdcb988a5c543893cc61bce354a6e24ab70022"
 
 [[projects]]
+  name = "github.com/memcachier/mc"
+  packages = ["."]
+  revision = "d03056eefd08e4d7f92630800bab4e431bc6a5e7"
+  version = "v2.0.1"
+
+[[projects]]
   name = "github.com/pkg/errors"
   packages = ["."]
   revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
   version = "v0.8.0"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/robfig/go-cache"
+  packages = ["."]
+  revision = "9fc39e0dbf62c034ec4e45e6120fc69433a3ec51"
 
 [[projects]]
   name = "github.com/satori/go.uuid"
@@ -175,6 +212,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "9b6ade7ef793054c6f7c427e06a2535d3033a559f0b44b55ba4e100b0ce7847e"
+  inputs-digest = "b27720bbdf6db7c77357fbe09165d678a5b7d2acae01b809eb85061e4298093e"
   solver-name = "gps-cdcl"
   solver-version = 1

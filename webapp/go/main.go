@@ -12,21 +12,19 @@ import (
 	"html/template"
 	"log"
 
+	"github.com/gin-contrib/cache"
+	"github.com/gin-contrib/cache/persistence"
 	"github.com/gin-contrib/pprof"
-	"github.com/gin-gonic/contrib/sessions"
 	"github.com/gin-gonic/gin"
-	"github.com/go-redis/redis"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/serinuntius/graqt"
 )
 
 var (
 	db           *sql.DB
-	rc           *redis.Client
 	traceEnabled = os.Getenv("GRAQT_TRACE")
 	driverName   = "mysql"
 	candidates   []Candidate
-	partyNames   []string
 	candidateMap map[string]int
 )
 
@@ -37,32 +35,12 @@ func getEnv(key, fallback string) string {
 	return fallback
 }
 
-func NewRedisClient() error {
-	rc = redis.NewClient(&redis.Options{
-		Network:  "unix",
-		Addr:     "/var/run/redis/redis-server.sock",
-		Password: "",
-		DB:       0,
-	})
-
-	_, err := rc.Ping().Result()
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func main() {
 	if traceEnabled == "1" {
 		// driverNameは絶対にこれでお願いします。
 		driverName = "mysql-tracer"
 		graqt.SetRequestLogger("log/request.log")
 		graqt.SetQueryLogger("log/query.log")
-	}
-
-	// redis connect
-	if err := NewRedisClient(); err != nil {
-		log.Fatal(err)
 	}
 
 	// database setting
@@ -120,12 +98,15 @@ func main() {
 	r.LoadHTMLGlob("templates/*.tmpl")
 
 	// session store
-	store := sessions.NewCookieStore([]byte("mysession"))
-	store.Options(sessions.Options{HttpOnly: true})
-	r.Use(sessions.Sessions("showwin_happy", store))
+	//store := sessions.NewCookieStore([]byte("mysession"))
+	//store.Options(sessions.Options{HttpOnly: true})
+	//r.Use(sessions.Sessions("showwin_happy", store))
+
+	// template cache store
+	store := persistence.NewInMemoryStore(time.Minute)
 
 	// GET /
-	r.GET("/", func(c *gin.Context) {
+	r.GET("/", cache.CachePage(store, time.Minute, func(c *gin.Context) {
 		electionResults := getElectionResult(c)
 
 		// 上位10人と最下位のみ表示
@@ -167,7 +148,7 @@ func main() {
 			"parties":    partyResults,
 			"sexRatio":   sexRatio,
 		})
-	})
+	}))
 
 	// GET /candidates/:candidateID(int)
 	r.GET("/candidates/:candidateID", func(c *gin.Context) {
@@ -248,6 +229,8 @@ func main() {
 
 		createVote(c, user.ID, candidateID, c.PostForm("keyword"), voteCount)
 
+		store.Flush()
+
 		c.HTML(http.StatusOK, "vote.tmpl", gin.H{
 			"candidates": candidates,
 			"message":    "投票に成功しました",
@@ -256,7 +239,6 @@ func main() {
 
 	r.GET("/initialize", func(c *gin.Context) {
 		db.Exec("DELETE FROM votes")
-		rc.FlushAll()
 
 		candidates = getAllCandidate(c)
 
@@ -264,8 +246,6 @@ func main() {
 		for _, c := range candidates {
 			candidateMap[c.Name] = c.ID
 		}
-
-		partyNames = getAllPartyName(c)
 
 		c.String(http.StatusOK, "Finish")
 	})
