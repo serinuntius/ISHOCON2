@@ -87,15 +87,16 @@ func getVoiceOfSupporter(candidateIDs []int) (voices []string) {
 		keywordCounter := map[string]int{}
 
 		for _, r := range results {
-			if len(keywordCounter) == 10 {
-				break
-			}
 			keyword := r.Member
 			if k, ok := keyword.(string); ok {
 				keywordCounter[k] += int(r.Score)
 			} else {
 				// string以外が入っていることはありえない
 				log.Fatal("string以外が入っていることはありえない(たぶん)")
+			}
+
+			if len(keywordCounter) == 10 {
+				break
 			}
 		}
 
