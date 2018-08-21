@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"sort"
@@ -18,6 +20,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/pkg/errors"
 	"github.com/serinuntius/graqt"
 )
 
@@ -265,22 +268,30 @@ func main() {
 	// POST /vote
 	r.POST("/vote", func(c *gin.Context) {
 		if c.PostForm("candidate") == "" {
-			voteError(c, "候補者を記入してください")
+			if err := voteErrorCache(c, "候補者を記入してください"); err != nil {
+				log.Fatal(err)
+			}
 			return
 		} else if c.PostForm("keyword") == "" {
-			voteError(c, "投票理由を記入してください")
+			if err := voteErrorCache(c, "投票理由を記入してください"); err != nil {
+				log.Fatal(err)
+			}
 			return
 		}
 
 		candidateID, ok := candidateMap[c.PostForm("candidate")]
 		if !ok {
-			voteError(c, "候補者を正しく記入してください")
+			if err := voteErrorCache(c, "候補者を正しく記入してください"); err != nil {
+				log.Fatal(err)
+			}
 			return
 		}
 
 		user, userErr := getUser(c, c.PostForm("name"), c.PostForm("address"), c.PostForm("mynumber"))
 		if userErr != nil {
-			voteError(c, "個人情報に誤りがあります")
+			if err := voteErrorCache(c, "個人情報に誤りがあります"); err != nil {
+				log.Fatal(err)
+			}
 			return
 		}
 
@@ -294,7 +305,9 @@ func main() {
 		}
 
 		if user.Votes < voteCount+int(userVotedCount) {
-			voteError(c, "投票数が上限を超えています")
+			if err := voteErrorCache(c, "投票数が上限を超えています"); err != nil {
+				log.Fatal(err)
+			}
 			return
 		}
 
@@ -310,6 +323,7 @@ func main() {
 			"candidates": candidates,
 			"message":    "投票に成功しました",
 		})
+
 	})
 
 	r.GET("/initialize", func(c *gin.Context) {
@@ -343,9 +357,43 @@ func main() {
 	//r.Run(":8080")
 }
 
-func voteError(c *gin.Context, msg string) {
-	log.Println(msg)
-	c.HTML(http.StatusOK, "vote.tmpl", gin.H{
-		"message": msg,
-	})
+func voteErrorCache(c *gin.Context, msg string) error {
+	cachedBytes, err := rc.Get(msg).Bytes()
+	if err != nil && err != redis.Nil {
+		return errors.Wrap(err, "Failed to rc.Get")
+	} else if err == redis.Nil {
+		// cacheがないので普通に返す
+		bcw := &bodyCacheWriter{
+			body:           &bytes.Buffer{},
+			ResponseWriter: c.Writer,
+		}
+		c.Writer = bcw
+
+		c.HTML(http.StatusOK, "vote.tmpl", gin.H{
+			"message": msg,
+		})
+
+		bs, err := ioutil.ReadAll(bcw.body)
+		if err != nil {
+			return errors.Wrap(err, "Failed to ReadAll")
+		}
+
+		if _, err := rc.Set(msg, bs, time.Minute).Result(); err != nil {
+			return errors.Wrap(err, "Failed to rc.Set")
+		}
+	}
+
+	// cacheがあるのでそれを返す
+	c.Writer.Write(cachedBytes)
+	return nil
+}
+
+type bodyCacheWriter struct {
+	gin.ResponseWriter
+	body *bytes.Buffer
+}
+
+func (w bodyCacheWriter) Write(b []byte) (int, error) {
+	w.body.Write(b)
+	return w.ResponseWriter.Write(b)
 }
