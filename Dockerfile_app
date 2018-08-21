@@ -17,6 +17,11 @@ RUN ["/bin/bash", "-c", "debconf-set-selections <<< 'mysql-server mysql-server/r
 RUN ["/bin/bash", "-c", "debconf-set-selections <<< 'mysql-service mysql-server/mysql-apt-config string 4'"]
 RUN apt-get install -y mysql-server
 
+# Redis
+RUN apt-get install -y redis
+
+RUN sudo mkdir /var/run/go/
+
 # Nginx のインストール
 RUN apt-get install -y nginx
 COPY admin/ssl/ /etc/nginx/ssl/

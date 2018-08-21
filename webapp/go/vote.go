@@ -3,7 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+
+	"github.com/pkg/errors"
 )
 
 // Vote Model
@@ -15,48 +16,50 @@ type Vote struct {
 	VotedCount  int
 }
 
-func createVote(ctx context.Context, userID int, candidateID int, keyword string, voteCount int) {
+func createVote(ctx context.Context, userID int, candidateID int, keyword string, voteCount int) error {
 	politicalParty := candidateIdMap[candidateID].PoliticalParty
 
 	_, err := rc.ZIncrBy(politicalParty, float64(voteCount), keyword).Result()
 	if err != nil {
-		log.Fatal(err)
+		return errors.Wrap(err, "")
 	}
 
 	_, err = rc.ZIncrBy(candidateKey(candidateID), float64(voteCount), keyword).Result()
 	if err != nil {
-		log.Fatal(err)
+		return errors.Wrap(err, "")
 	}
 
 	_, err = rc.ZIncrBy(kojinKey(), float64(voteCount), candidateVotedCountKey(candidateID)).Result()
 	if err != nil {
-		log.Fatal(err)
+		return errors.Wrap(err, "")
 	}
 
 	_, err = rc.IncrBy(userKey(userID), int64(voteCount)).Result()
 	if err != nil {
-		log.Fatal(err)
+		return errors.Wrap(err, "")
 	}
+
+	return nil
 }
 
-func getVoiceOfSupporter(candidateID int) (voices []string) {
+func getVoiceOfSupporter(candidateID int) ([]string, error) {
 	politicalParty := candidateIdMap[candidateID].PoliticalParty
 
 	voices, err := rc.ZRevRange(politicalParty, 0, 10).Result()
 	if err != nil {
-		log.Fatal(err)
+		return nil, errors.Wrap(err, "")
 	}
 
-	return
+	return voices, nil
 }
 
-func getVoiceOfSupporterByParties(politicalParty string) (voices []string) {
+func getVoiceOfSupporterByParties(politicalParty string) ([]string, error) {
 	voices, err := rc.ZRevRange(politicalParty, 0, 10).Result()
 	if err != nil {
-		log.Fatal(err)
+		return nil, errors.Wrap(err, "")
 	}
 
-	return
+	return voices, nil
 }
 
 func candidateVotedCountKey(candidateID int) string {
@@ -64,11 +67,11 @@ func candidateVotedCountKey(candidateID int) string {
 }
 
 func candidateKey(candidateID int) string {
-	return "candidate:" + string(candidateID)
+	return fmt.Sprintf("candidate:%d", candidateID)
 }
 
 func userKey(userID int) string {
-	return "user:" + string(userID)
+	return fmt.Sprintf("user:%d", userID)
 }
 
 func kojinKey() string {

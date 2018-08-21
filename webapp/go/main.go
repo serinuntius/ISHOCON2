@@ -120,8 +120,13 @@ func main() {
 		candidateIDs := make([]int, len(results))
 		votedCounts := make([]int, len(results))
 
+		log.Printf("len(reuslts): %d", len(results))
+
 		for i, r := range results {
 			candidateVotedCountKey, votedCount := r.Member, r.Score
+
+			log.Printf("candidateVotedCountKey: %d\n", candidateVotedCountKey)
+			log.Printf("votedCount: %d\n", votedCount)
 			if cKey, ok := candidateVotedCountKey.(string); ok {
 				idx := strings.Index(cKey, ":")
 				candidateID := cKey[idx+1:]
@@ -194,7 +199,11 @@ func main() {
 			c.Redirect(http.StatusFound, "/")
 		}
 
-		keywords := getVoiceOfSupporter(candidateID)
+		keywords, err := getVoiceOfSupporter(candidateID)
+		if err != nil {
+			log.Fatal(err)
+		}
+
 		votedCount, err := rc.Get(candidateVotedCountKey(candidateID)).Int64()
 		if err != nil {
 			log.Fatal(err)
@@ -223,7 +232,10 @@ func main() {
 
 			votes += int(votedCount)
 		}
-		keywords := getVoiceOfSupporterByParties(partyName)
+		keywords, err := getVoiceOfSupporterByParties(partyName)
+		if err != nil {
+			log.Fatal(err)
+		}
 
 		c.HTML(http.StatusOK, "political_party.tmpl", gin.H{
 			"politicalParty": partyName,
@@ -266,12 +278,13 @@ func main() {
 		voteCount, _ := strconv.Atoi(c.PostForm("vote_count"))
 
 		userVotedCount, err := rc.Get(userKey(user.ID)).Int64()
-		if err != redis.Nil {
+		if err != nil && err != redis.Nil {
 			log.Fatal(err)
 		} else if err == redis.Nil {
 			userVotedCount = 0
 		}
 
+		log.Printf("user.Votes: %d, voteCount: %d, int(userVotedCount): %d\n", user.Votes, voteCount, int(userVotedCount))
 		if user.Votes < voteCount+int(userVotedCount) {
 			voteError(c, "投票数が上限を超えています")
 			return
@@ -294,12 +307,21 @@ func main() {
 		store.Flush()
 
 		candidates = getAllCandidate(c)
+		initialVoteCount := 0
 
 		candidateMap = make(map[string]int, len(candidates))
 		candidateIdMap = make(map[int]Candidate, len(candidates))
+
+		log.Printf("len(candidates): %d", len(candidates))
 		for _, c := range candidates {
 			candidateMap[c.Name] = c.ID
 			candidateIdMap[c.ID] = c
+
+			// 初期化でキャッシュに0で投票しておく
+			_, err = rc.ZIncrBy(kojinKey(), float64(initialVoteCount), candidateVotedCountKey(c.ID)).Result()
+			if err != nil {
+				log.Fatal(err)
+			}
 		}
 
 		c.String(http.StatusOK, "Finish")
@@ -310,6 +332,7 @@ func main() {
 }
 
 func voteError(c *gin.Context, msg string) {
+	log.Println(msg)
 	c.HTML(http.StatusOK, "vote.tmpl", gin.H{
 		"message": msg,
 	})
