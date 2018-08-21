@@ -290,6 +290,7 @@ func main() {
 		user, userErr := getUser(c, c.PostForm("name"), c.PostForm("address"), c.PostForm("mynumber"))
 		if userErr != nil {
 			if err := voteErrorCache(c, "個人情報に誤りがあります"); err != nil {
+				log.Println(userErr)
 				log.Fatal(err)
 			}
 			return
@@ -336,7 +337,6 @@ func main() {
 		candidateMap = make(map[string]int, len(candidates))
 		candidateIdMap = make(map[int]Candidate, len(candidates))
 
-		log.Printf("len(candidates): %d", len(candidates))
 		for _, c := range candidates {
 			candidateMap[c.Name] = c.ID
 			candidateIdMap[c.ID] = c
