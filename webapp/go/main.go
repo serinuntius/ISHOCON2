@@ -298,9 +298,11 @@ func main() {
 			return
 		}
 
-		if err := createVote(c, user.ID, candidateID, c.PostForm("keyword"), voteCount); err != nil {
-			log.Fatal(err)
-		}
+		go func() {
+			if err := createVote(c, user.ID, candidateID, c.PostForm("keyword"), voteCount); err != nil {
+				log.Fatal(err)
+			}
+		}()
 
 		store.Flush()
 
