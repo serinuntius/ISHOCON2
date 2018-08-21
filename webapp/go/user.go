@@ -68,7 +68,7 @@ func cacheAllUserMynumbers(ctx context.Context) error {
 
 	for rows.Next() {
 		var user User
-		if err := rows.Scan(&user); err != nil {
+		if err := rows.Scan(&user.ID, &user.Name, &user.Address, &user.MyNumber, &user.Votes, &user.VotedCount); err != nil {
 			return errors.Wrap(err, "Failed to scan user")
 		}
 		if _, err := rc.Set(myNumberKey(user.MyNumber), &user, time.Minute).Result(); err != nil {
