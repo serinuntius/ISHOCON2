@@ -60,6 +60,25 @@ func getUser(ctx context.Context, name string, address string, myNumber string) 
 	return &user, nil
 }
 
+func cacheAllUserMynumbers(ctx context.Context) error {
+	rows, err := db.QueryContext(ctx, "SELECT * FROM users")
+	if err != nil {
+		return errors.Wrap(err, "Failed to QueryContext")
+	}
+
+	for rows.Next() {
+		var user User
+		if err := rows.Scan(&user); err != nil {
+			return errors.Wrap(err, "Failed to scan user")
+		}
+		if _, err := rc.Set(myNumberKey(user.MyNumber), &user, time.Minute).Result(); err != nil {
+			return errors.Wrap(err, "Failed to Set Redis")
+		}
+	}
+
+	return nil
+}
+
 func myNumberKey(mynumber string) string {
 	return fmt.Sprintf("myNumberKey:%s", mynumber)
 }

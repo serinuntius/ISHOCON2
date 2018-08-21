@@ -331,6 +331,10 @@ func main() {
 		rc.FlushAll()
 		store.Flush()
 
+		if err := cacheAllUserMynumbers(c); err != nil {
+			log.Fatal(err)
+		}
+
 		candidates = getAllCandidate(c)
 		initialVoteCount := 0
 
