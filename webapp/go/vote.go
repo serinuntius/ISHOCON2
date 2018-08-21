@@ -2,9 +2,10 @@ package main
 
 import (
 	"context"
-	"database/sql"
-	"log"
-	"strings"
+	"fmt"
+
+	"github.com/pkg/errors"
+	"golang.org/x/sync/errgroup"
 )
 
 // Vote Model
@@ -16,80 +17,106 @@ type Vote struct {
 	VotedCount  int
 }
 
-func createVote(ctx context.Context, userID int, candidateID int, keyword string, voteCount int) {
-	tx, err := db.Begin()
-	if err != nil {
-		log.Println(err)
-		return
-	}
+func createVote(ctx context.Context, userID int, candidateID int, keyword string, voteCount int) error {
+	politicalParty := candidateIdMap[candidateID].PoliticalParty
 
-	vote := Vote{}
+	var eg errgroup.Group
 
-	row := db.QueryRowContext(ctx, "SELECT id, keyword, voted_count FROM votes WHERE keyword = ? AND user_id = ? AND candidate_id = ? FOR UPDATE", keyword, userID, candidateID)
-	err = row.Scan(&vote.ID, &vote.Keyword, &vote.VotedCount)
-	if err != nil && err != sql.ErrNoRows {
-		log.Fatal(err)
-	} else if err == sql.ErrNoRows {
-		// no row => insert
-		_, err := tx.ExecContext(ctx, "INSERT INTO votes (user_id, candidate_id, keyword, voted_count) VALUES (?, ?, ?, ?)", userID, candidateID, keyword, voteCount)
+	eg.Go(func() error {
+		_, err := rc.ZIncrBy(politicalParty, float64(voteCount), keyword).Result()
 		if err != nil {
-			log.Fatal(err)
+			return errors.Wrap(err, "")
 		}
-	} else {
-		// update
-		if _, err := tx.ExecContext(ctx,
-			"UPDATE votes SET voted_count = ? WHERE id = ?",
-			vote.VotedCount+1, vote.ID); err != nil {
-			log.Fatal(err)
+		return nil
+	})
+
+	eg.Go(func() error {
+		_, err := rc.ZIncrBy(candidateZKey(candidateID), float64(voteCount), keyword).Result()
+		if err != nil {
+			return errors.Wrap(err, "")
 		}
+		return nil
+	})
+
+	eg.Go(func() error {
+		_, err := rc.ZIncrBy(kojinKey(), float64(voteCount), candidateVotedCountKey(candidateID)).Result()
+		if err != nil {
+			return errors.Wrap(err, "")
+		}
+		return nil
+	})
+
+	eg.Go(func() error {
+		_, err := rc.IncrBy(candidateKey(candidateID), int64(voteCount)).Result()
+		if err != nil {
+			return errors.Wrap(err, "")
+		}
+		return nil
+	})
+
+	eg.Go(func() error {
+		_, err := rc.IncrBy(userKey(userID), int64(voteCount)).Result()
+		if err != nil {
+			return errors.Wrap(err, "")
+		}
+		return nil
+	})
+
+	eg.Go(func() error {
+		sex := candidateIdMap[candidateID].Sex
+		_, err := rc.IncrBy(sexKey(sex), int64(voteCount)).Result()
+		if err != nil {
+			return errors.Wrap(err, "")
+		}
+		return nil
+	})
+
+
+	if err := eg.Wait(); err != nil {
+		return errors.Wrap(err, "Failed to wait")
 	}
 
-	if _, err := tx.ExecContext(ctx,
-		"UPDATE users SET voted_count = voted_count + ? WHERE id = ?",
-		voteCount, userID); err != nil {
-		log.Fatal(err)
-	}
-
-	if _, err := tx.ExecContext(ctx,
-		"UPDATE candidates SET voted_count = voted_count + ? WHERE id = ?",
-		voteCount, candidateID); err != nil {
-		log.Fatal(err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		rerr := tx.Rollback()
-		log.Fatal(rerr)
-	}
+	return nil
 }
 
-func getVoiceOfSupporter(ctx context.Context, candidateIDs []int) (voices []string) {
-	args := []interface{}{}
-	for _, candidateID := range candidateIDs {
-		args = append(args, candidateID)
-	}
-	rows, err := db.QueryContext(ctx, `
-    SELECT
-		keyword,
-		SUM(voted_count) AS sum_vote
-    FROM votes
-    WHERE candidate_id IN (`+ strings.Join(strings.Split(strings.Repeat("?", len(candidateIDs)), ""), ",")+ `)
-	GROUP BY keyword
-	ORDER BY sum_vote DESC
-    LIMIT 10`, args...)
+func getVoiceOfSupporter(candidateID int) ([]string, error) {
+	voices, err := rc.ZRevRange(candidateZKey(candidateID), 0, 10).Result()
 	if err != nil {
-		log.Fatal(err)
-		return nil
+		return nil, errors.Wrap(err, "")
 	}
 
-	defer rows.Close()
-	for rows.Next() {
-		var keyword string
-		var votedCount int
-		err = rows.Scan(&keyword, &votedCount)
-		if err != nil {
-			panic(err.Error())
-		}
-		voices = append(voices, keyword)
+	return voices, nil
+}
+
+func getVoiceOfSupporterByParties(politicalParty string) ([]string, error) {
+	voices, err := rc.ZRevRange(politicalParty, 0, 10).Result()
+	if err != nil {
+		return nil, errors.Wrap(err, "")
 	}
-	return
+
+	return voices, nil
+}
+
+func candidateVotedCountKey(candidateID int) string {
+	return fmt.Sprintf("candidateVotedCount:%d", candidateID)
+}
+
+func candidateZKey(candidateID int) string {
+	return fmt.Sprintf("candidatez:%d", candidateID)
+}
+
+func candidateKey(candidateID int) string {
+	return fmt.Sprintf("candidate:%d", candidateID)
+}
+
+func userKey(userID int) string {
+	return fmt.Sprintf("user:%d", userID)
+}
+
+func kojinKey() string {
+	return "kojinkey"
+}
+
+func sexKey(sex string) string {
+	return "sex:" + sex
 }
