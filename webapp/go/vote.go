@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
+	"golang.org/x/sync/errgroup"
 )
 
 // Vote Model
@@ -19,35 +20,55 @@ type Vote struct {
 func createVote(ctx context.Context, userID int, candidateID int, keyword string, voteCount int) error {
 	politicalParty := candidateIdMap[candidateID].PoliticalParty
 
-	_, err := rc.ZIncrBy(politicalParty, float64(voteCount), keyword).Result()
-	if err != nil {
-		return errors.Wrap(err, "")
-	}
+	var eg errgroup.Group
 
-	_, err = rc.ZIncrBy(candidateZKey(candidateID), float64(voteCount), keyword).Result()
-	if err != nil {
-		return errors.Wrap(err, "")
-	}
+	eg.Go(func() error {
+		_, err := rc.ZIncrBy(politicalParty, float64(voteCount), keyword).Result()
+		if err != nil {
+			return errors.Wrap(err, "")
+		}
+	})
 
-	_, err = rc.ZIncrBy(kojinKey(), float64(voteCount), candidateVotedCountKey(candidateID)).Result()
-	if err != nil {
-		return errors.Wrap(err, "")
-	}
+	eg.Go(func() error {
+		_, err := rc.ZIncrBy(candidateZKey(candidateID), float64(voteCount), keyword).Result()
+		if err != nil {
+			return errors.Wrap(err, "")
+		}
+	})
 
-	_, err = rc.IncrBy(candidateKey(candidateID), int64(voteCount)).Result()
-	if err != nil {
-		return errors.Wrap(err, "")
-	}
+	eg.Go(func() error {
+		_, err := rc.ZIncrBy(kojinKey(), float64(voteCount), candidateVotedCountKey(candidateID)).Result()
+		if err != nil {
+			return errors.Wrap(err, "")
+		}
+	})
 
-	_, err = rc.IncrBy(userKey(userID), int64(voteCount)).Result()
-	if err != nil {
-		return errors.Wrap(err, "")
-	}
+	eg.Go(func() error {
+		_, err := rc.IncrBy(candidateKey(candidateID), int64(voteCount)).Result()
+		if err != nil {
+			return errors.Wrap(err, "")
+		}
 
-	sex := candidateIdMap[candidateID].Sex
-	_, err = rc.IncrBy(sexKey(sex), int64(voteCount)).Result()
-	if err != nil {
-		return errors.Wrap(err, "")
+	})
+
+	eg.Go(func() error {
+		_, err := rc.IncrBy(userKey(userID), int64(voteCount)).Result()
+		if err != nil {
+			return errors.Wrap(err, "")
+		}
+	})
+
+	eg.Go(func() error {
+		sex := candidateIdMap[candidateID].Sex
+		_, err := rc.IncrBy(sexKey(sex), int64(voteCount)).Result()
+		if err != nil {
+			return errors.Wrap(err, "")
+		}
+	})
+
+
+	if err := eg.Wait(); err != nil {
+		return errors.Wrap(err, "Failed to wait")
 	}
 
 	return nil
