@@ -27,6 +27,7 @@ func createVote(ctx context.Context, userID int, candidateID int, keyword string
 		if err != nil {
 			return errors.Wrap(err, "")
 		}
+		return nil
 	})
 
 	eg.Go(func() error {
@@ -34,6 +35,7 @@ func createVote(ctx context.Context, userID int, candidateID int, keyword string
 		if err != nil {
 			return errors.Wrap(err, "")
 		}
+		return nil
 	})
 
 	eg.Go(func() error {
@@ -41,6 +43,7 @@ func createVote(ctx context.Context, userID int, candidateID int, keyword string
 		if err != nil {
 			return errors.Wrap(err, "")
 		}
+		return nil
 	})
 
 	eg.Go(func() error {
@@ -48,7 +51,7 @@ func createVote(ctx context.Context, userID int, candidateID int, keyword string
 		if err != nil {
 			return errors.Wrap(err, "")
 		}
-
+		return nil
 	})
 
 	eg.Go(func() error {
@@ -56,6 +59,7 @@ func createVote(ctx context.Context, userID int, candidateID int, keyword string
 		if err != nil {
 			return errors.Wrap(err, "")
 		}
+		return nil
 	})
 
 	eg.Go(func() error {
@@ -64,6 +68,7 @@ func createVote(ctx context.Context, userID int, candidateID int, keyword string
 		if err != nil {
 			return errors.Wrap(err, "")
 		}
+		return nil
 	})
 
 
