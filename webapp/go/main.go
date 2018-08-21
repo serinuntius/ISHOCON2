@@ -293,13 +293,14 @@ func main() {
 			userVotedCount = 0
 		}
 
-		log.Printf("user.Votes: %d, voteCount: %d, int(userVotedCount): %d\n", user.Votes, voteCount, int(userVotedCount))
 		if user.Votes < voteCount+int(userVotedCount) {
 			voteError(c, "投票数が上限を超えています")
 			return
 		}
 
-		createVote(c, user.ID, candidateID, c.PostForm("keyword"), voteCount)
+		if err := createVote(c, user.ID, candidateID, c.PostForm("keyword"), voteCount); err != nil {
+			log.Fatal(err)
+		}
 
 		store.Flush()
 
