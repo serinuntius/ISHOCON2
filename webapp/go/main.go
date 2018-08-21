@@ -319,11 +319,9 @@ func main() {
 
 		store.Flush()
 
-		c.HTML(http.StatusOK, "vote.tmpl", gin.H{
-			"candidates": candidates,
-			"message":    "投票に成功しました",
-		})
-
+		if err := voteCache(c); err != nil {
+			log.Fatal(err)
+		}
 	})
 
 	r.GET("/initialize", func(c *gin.Context) {
@@ -355,6 +353,40 @@ func main() {
 
 	r.RunUnix("/var/run/go/go.sock")
 	//r.Run(":8080")
+}
+
+const voteCacheKey = "voteCache"
+
+func voteCache(c *gin.Context) error {
+	cachedBytes, err := rc.Get(voteCacheKey).Bytes()
+	if err != nil && err != redis.Nil {
+		return errors.Wrap(err, "Failed to rc.Get")
+	} else if err == redis.Nil {
+		// cacheがないので普通に返す
+		bcw := &bodyCacheWriter{
+			body:           &bytes.Buffer{},
+			ResponseWriter: c.Writer,
+		}
+		c.Writer = bcw
+
+		c.HTML(http.StatusOK, "vote.tmpl", gin.H{
+			"candidates": candidates,
+			"message":    "投票に成功しました",
+		})
+
+		bs, err := ioutil.ReadAll(bcw.body)
+		if err != nil {
+			return errors.Wrap(err, "Failed to ReadAll")
+		}
+
+		if _, err := rc.Set(voteCacheKey, bs, time.Minute).Result(); err != nil {
+			return errors.Wrap(err, "Failed to rc.Set")
+		}
+	}
+
+	// cacheがあるのでそれを返す
+	c.Writer.Write(cachedBytes)
+	return nil
 }
 
 func voteErrorCache(c *gin.Context, msg string) error {
