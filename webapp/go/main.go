@@ -114,19 +114,17 @@ func main() {
 
 		// 最下位
 		resultsWorst, err := rc.ZRangeWithScores(kojinKey(), 0, 0).Result()
+		if err != nil {
+			log.Fatal(err)
+		}
 		results = append(results, resultsWorst...)
 
 		// 1 ~ 10と最下位の分枠を用意しておく
 		candidateIDs := make([]int, len(results))
 		votedCounts := make([]int, len(results))
 
-		log.Printf("len(reuslts): %d", len(results))
-
 		for i, r := range results {
 			candidateVotedCountKey, votedCount := r.Member, r.Score
-
-			log.Printf("candidateVotedCountKey: %d\n", candidateVotedCountKey)
-			log.Printf("votedCount: %d\n", votedCount)
 			if cKey, ok := candidateVotedCountKey.(string); ok {
 				idx := strings.Index(cKey, ":")
 				candidateID := cKey[idx+1:]
@@ -140,9 +138,23 @@ func main() {
 			}
 		}
 
+		menCount, err := rc.Get(sexKey("男")).Int64()
+		if err != nil && err != redis.Nil {
+			log.Fatal(err)
+		} else if err == redis.Nil {
+			menCount = 0
+		}
+
+		womenCount, err := rc.Get(sexKey("女")).Int64()
+		if err != nil && err != redis.Nil {
+			log.Fatal(err)
+		} else if err == redis.Nil {
+			womenCount = 0
+		}
+
 		sexRatio := map[string]int{
-			"men":   0,
-			"women": 0,
+			"men":   int(menCount),
+			"women": int(womenCount),
 		}
 
 		//partyElectionResults := [4]PartyElectionResult{}
@@ -153,13 +165,6 @@ func main() {
 		for idx, cID := range candidateIDs {
 			sex := candidateIdMap[cID].Sex
 			partyName := candidateIdMap[cID].PoliticalParty
-
-			if sex == "男" {
-				sexRatio["men"] += votedCounts[idx]
-			} else {
-				sexRatio["women"] += votedCounts[idx]
-			}
-
 			cs = append(cs, CandidateElectionResult{
 				ID:             cID,
 				Name:           candidateIdMap[cID].Name,
@@ -204,9 +209,11 @@ func main() {
 			log.Fatal(err)
 		}
 
-		votedCount, err := rc.Get(candidateVotedCountKey(candidateID)).Int64()
-		if err != nil {
+		votedCount, err := rc.Get(candidateKey(candidateID)).Int64()
+		if err != nil && err != redis.Nil {
 			log.Fatal(err)
+		} else if err == redis.Nil {
+			votedCount = 0
 		}
 
 		c.HTML(http.StatusOK, "candidate.tmpl", gin.H{
@@ -225,9 +232,11 @@ func main() {
 		var votes int
 
 		for _, c := range candidates {
-			votedCount, err := rc.Get(candidateVotedCountKey(c.ID)).Int64()
-			if err != nil {
+			votedCount, err := rc.Get(candidateKey(c.ID)).Int64()
+			if err != nil && err != redis.Nil {
 				log.Fatal(err)
+			} else if err == redis.Nil {
+				votedCount = 0
 			}
 
 			votes += int(votedCount)

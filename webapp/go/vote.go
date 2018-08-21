@@ -24,7 +24,7 @@ func createVote(ctx context.Context, userID int, candidateID int, keyword string
 		return errors.Wrap(err, "")
 	}
 
-	_, err = rc.ZIncrBy(candidateKey(candidateID), float64(voteCount), keyword).Result()
+	_, err = rc.ZIncrBy(candidateZKey(candidateID), float64(voteCount), keyword).Result()
 	if err != nil {
 		return errors.Wrap(err, "")
 	}
@@ -34,7 +34,18 @@ func createVote(ctx context.Context, userID int, candidateID int, keyword string
 		return errors.Wrap(err, "")
 	}
 
+	_, err = rc.IncrBy(candidateKey(candidateID), int64(voteCount)).Result()
+	if err != nil {
+		return errors.Wrap(err, "")
+	}
+
 	_, err = rc.IncrBy(userKey(userID), int64(voteCount)).Result()
+	if err != nil {
+		return errors.Wrap(err, "")
+	}
+
+	sex := candidateIdMap[candidateID].Sex
+	_, err = rc.IncrBy(sexKey(sex), int64(voteCount)).Result()
 	if err != nil {
 		return errors.Wrap(err, "")
 	}
@@ -43,9 +54,7 @@ func createVote(ctx context.Context, userID int, candidateID int, keyword string
 }
 
 func getVoiceOfSupporter(candidateID int) ([]string, error) {
-	politicalParty := candidateIdMap[candidateID].PoliticalParty
-
-	voices, err := rc.ZRevRange(politicalParty, 0, 10).Result()
+	voices, err := rc.ZRevRange(candidateZKey(candidateID), 0, 10).Result()
 	if err != nil {
 		return nil, errors.Wrap(err, "")
 	}
@@ -66,6 +75,10 @@ func candidateVotedCountKey(candidateID int) string {
 	return fmt.Sprintf("candidateVotedCount:%d", candidateID)
 }
 
+func candidateZKey(candidateID int) string {
+	return fmt.Sprintf("candidatez:%d", candidateID)
+}
+
 func candidateKey(candidateID int) string {
 	return fmt.Sprintf("candidate:%d", candidateID)
 }
@@ -76,4 +89,8 @@ func userKey(userID int) string {
 
 func kojinKey() string {
 	return "kojinkey"
+}
+
+func sexKey(sex string) string {
+	return "sex:" + sex
 }
