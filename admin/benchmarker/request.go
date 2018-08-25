@@ -17,11 +17,11 @@ import (
 )
 
 func getInitialize() {
-	log.Print("Start GET /initialize")
+	postMessage("Start GET /initialize")
 	finishTime := time.Now().Add(10 * time.Second)
 	httpsRequest("GET", "/initialize", nil)
 	if time.Now().Sub(finishTime) > 0 {
-		log.Print("Timeover at GET /initialize")
+		postMessage("Timeover at GET /initialize")
 		os.Exit(1)
 	}
 }
@@ -94,7 +94,7 @@ func httpsRequest(method string, path string, params url.Values) int {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Print(err)
+		postMessage(method + " " + path + " へのリクエストが成功しませんでした。")
 		return 500
 	}
 	defer resp.Body.Close()
@@ -109,14 +109,14 @@ func httpsRequestDoc(method string, path string, params url.Values) *goquery.Doc
 
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Print(err)
+		postMessage(method + " " + path + " へのリクエストが成功しませんでした。")
 		os.Exit(1)
 	}
 	defer resp.Body.Close()
 
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
-		log.Print(err)
+		postMessage(method + " " + path + " へのリクエストが成功しませんでした。")
 		os.Exit(1)
 	}
 

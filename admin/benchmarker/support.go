@@ -1,8 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"database/sql"
+	"log"
 	"math/rand"
+	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -27,14 +31,55 @@ type Candidate struct {
 	Sex   string
 }
 
+var db *sql.DB
+
+func init() {
+	dbUser := os.Getenv("MYSQL_USER")
+	dbPass := os.Getenv("MYSQL_PASS")
+	dbHost := os.Getenv("MYSQL_HOST")
+	var err error
+	db, err = sql.Open("mysql", dbUser+":"+dbPass+"@tcp("+dbHost+":3306)/ishocon2")
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+
+func postMessage(message string) {
+	now := time.Now().Unix()
+	jsonStr := `{"content":"` + message + `","timestamp":"` + strconv.FormatInt(now, 10) + `"}`
+	req, _ := http.NewRequest("POST",
+		"https://ishocon2.firebaseio.com/messages/"+username+".json",
+		bytes.NewBuffer([]byte(jsonStr)))
+	req.Header.Set("Content-Type", "application/json")
+	client := clients[rand.Intn(len(clients))]
+
+	client.Do(req)
+}
+
+func postResult(score int, success int, failure int) {
+	now := time.Now().Unix()
+	jsonStr := `{"score":` + strconv.Itoa(totalScore) +
+		`,"success":` + strconv.Itoa(success) +
+		`,"failure":` + strconv.Itoa(failure) +
+		`,"timestamp":` + strconv.FormatInt(now, 10) + `}`
+	req, _ := http.NewRequest("POST",
+		"https://ishocon2.firebaseio.com/teams/"+username+".json",
+		bytes.NewBuffer([]byte(jsonStr)))
+	req.Header.Set("Content-Type", "application/json")
+	client := clients[rand.Intn(len(clients))]
+
+	client.Do(req)
+}
+
+func flushMessage() {
+	req, _ := http.NewRequest("DELETE", "https://ishocon2.firebaseio.com/messages/"+username+".json", nil)
+	client := clients[rand.Intn(len(clients))]
+	client.Do(req)
+}
+
 func setupVotes(size int, forValidate bool) []Vote {
 	var voteSet []Vote
-
-	db, err := sql.Open("mysql", "ishocon:ishocon@/ishocon2")
-	if err != nil {
-		panic(err.Error())
-	}
-	defer db.Close()
 
 	// size 人数分の投票者を選ぶ
 	query := "SELECT name, address, mynumber, votes FROM users WHERE id IN ("
@@ -139,14 +184,8 @@ func getRandKeyword() string {
 }
 
 func getCndInfo(name string) Candidate {
-	db, err := sql.Open("mysql", "ishocon:ishocon@/ishocon2")
-	if err != nil {
-		panic(err.Error())
-	}
-	defer db.Close()
-
 	var c Candidate
-	err = db.QueryRow("SELECT * FROM candidates WHERE name = ? LIMIT 1", name).Scan(&c.ID, &c.Name, &c.Party, &c.Sex)
+	err := db.QueryRow("SELECT * FROM candidates WHERE name = ? LIMIT 1", name).Scan(&c.ID, &c.Name, &c.Party, &c.Sex)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -155,14 +194,8 @@ func getCndInfo(name string) Candidate {
 
 // 候補者名から政党名を返す
 func getPatryInfo(name string) string {
-	db, err := sql.Open("mysql", "ishocon:ishocon@/ishocon2")
-	if err != nil {
-		panic(err.Error())
-	}
-	defer db.Close()
-
 	var party string
-	err = db.QueryRow("SELECT political_party FROM candidates WHERE name = ? LIMIT 1", name).Scan(&party)
+	err := db.QueryRow("SELECT political_party FROM candidates WHERE name = ? LIMIT 1", name).Scan(&party)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -170,12 +203,6 @@ func getPatryInfo(name string) string {
 }
 
 func membersOf(party string) (members []string) {
-	db, err := sql.Open("mysql", "ishocon:ishocon@/ishocon2")
-	if err != nil {
-		panic(err.Error())
-	}
-	defer db.Close()
-
 	rows, err := db.Query("SELECT name FROM candidates WHERE political_party = ?", party)
 	if err != nil {
 		panic(err.Error())

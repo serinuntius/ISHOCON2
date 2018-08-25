@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"net/url"
 	"os"
 	"sort"
@@ -36,13 +35,13 @@ func validateVote(voteSet []Vote) {
 		// 投票が成功したことの確認
 		message := doc.Find(".text-danger").Text()
 		if !strings.Contains(message, "投票に成功しました") {
-			log.Print("正しい情報で投票ができません at POST /vote")
+			postMessage("正しい情報で投票ができません at POST /vote")
 			os.Exit(1)
 		}
 
 		// DOMの構造確認
 		if doc.Find("fieldset").Children().Size() != 14 {
-			log.Print("DOM の構造が正しくありません at POST /vote")
+			postMessage("DOM の構造が正しくありません at POST /vote")
 			os.Exit(1)
 		}
 	}
@@ -65,7 +64,7 @@ func validateVoteError(voteSet []Vote) {
 	// 投票が成功したことの確認
 	message := doc.Find(".text-danger").Text()
 	if !strings.Contains(message, "個人情報に誤りがあります") {
-		log.Print("エラーメッセージに誤りがあります at POST /vote")
+		postMessage("エラーメッセージに誤りがあります at POST /vote")
 		os.Exit(1)
 	}
 
@@ -85,7 +84,7 @@ func validateVoteError(voteSet []Vote) {
 	// 投票が成功したことの確認
 	message = doc.Find(".text-danger").Text()
 	if !strings.Contains(message, "個人情報に誤りがあります") {
-		log.Print("エラーメッセージに誤りがあります at POST /vote")
+		postMessage("エラーメッセージに誤りがあります at POST /vote")
 		os.Exit(1)
 	}
 
@@ -105,7 +104,7 @@ func validateVoteError(voteSet []Vote) {
 	// 投票が成功したことの確認
 	message = doc.Find(".text-danger").Text()
 	if !strings.Contains(message, "個人情報に誤りがあります") {
-		log.Print("エラーメッセージに誤りがあります at POST /vote")
+		postMessage("エラーメッセージに誤りがあります at POST /vote")
 		os.Exit(1)
 	}
 
@@ -125,7 +124,7 @@ func validateVoteError(voteSet []Vote) {
 	// 投票が成功したことの確認
 	message = doc.Find(".text-danger").Text()
 	if !strings.Contains(message, "投票数が上限を超えています") {
-		log.Print("エラーメッセージに誤りがあります at POST /vote")
+		postMessage("エラーメッセージに誤りがあります at POST /vote")
 		os.Exit(1)
 	}
 
@@ -145,7 +144,7 @@ func validateVoteError(voteSet []Vote) {
 	// 投票が成功したことの確認
 	message = doc.Find(".text-danger").Text()
 	if !strings.Contains(message, "候補者を記入してください") {
-		log.Print("エラーメッセージに誤りがあります at POST /vote")
+		postMessage("エラーメッセージに誤りがあります at POST /vote")
 		os.Exit(1)
 	}
 
@@ -165,7 +164,7 @@ func validateVoteError(voteSet []Vote) {
 	// 投票が成功したことの確認
 	message = doc.Find(".text-danger").Text()
 	if !strings.Contains(message, "候補者を正しく記入してください") {
-		log.Print("エラーメッセージに誤りがあります at POST /vote")
+		postMessage("エラーメッセージに誤りがあります at POST /vote")
 		os.Exit(1)
 	}
 
@@ -185,7 +184,7 @@ func validateVoteError(voteSet []Vote) {
 	// 投票が成功したことの確認
 	message = doc.Find(".text-danger").Text()
 	if !strings.Contains(message, "投票理由を記入してください") {
-		log.Print("エラーメッセージに誤りがあります at POST /vote")
+		postMessage("エラーメッセージに誤りがあります at POST /vote")
 		os.Exit(1)
 	}
 }
@@ -198,7 +197,7 @@ func validateIndex(voteSet []Vote) {
 	ptErrFlg := doc.Find("#parties").Children().Size() != 4
 	sxErrFlg := doc.Find("#sex_ratio").Children().Size() != 2
 	if ppErrFlg || ptErrFlg || sxErrFlg {
-		log.Print("DOMの構造が正しくありません at GET /index")
+		postMessage("DOMの構造が正しくありません at GET /index")
 		os.Exit(1)
 	}
 
@@ -226,7 +225,7 @@ func validateIndex(voteSet []Vote) {
 			cand2 := strconv.Itoa(i+1) + ". " + l[l.Len()-1-i].name
 			cand3 := strconv.Itoa(i+1) + ". " + l[l.Len()-2-i].name
 			if !strings.Contains(str, cand1) && !strings.Contains(str, cand2) && !strings.Contains(str, cand3) {
-				log.Print("個人の部の選挙結果が正しくありません at GET /")
+				postMessage("個人の部の選挙結果が正しくありません at GET /")
 				os.Exit(1)
 			}
 		}
@@ -257,7 +256,7 @@ func validateIndex(voteSet []Vote) {
 			cand2 := strconv.Itoa(i+1) + ". " + l[l.Len()-1-i].name
 			cand3 := strconv.Itoa(i+1) + ". " + l[l.Len()-2-i].name
 			if !strings.Contains(str, cand1) && !strings.Contains(str, cand2) && !strings.Contains(str, cand3) {
-				log.Print("政党の部の選挙結果が正しくありません at GET /")
+				postMessage("政党の部の選挙結果が正しくありません at GET /")
 				os.Exit(1)
 			}
 		}
@@ -277,10 +276,10 @@ func validateIndex(voteSet []Vote) {
 		if i < 3 {
 			str := s.Text()
 			if !strings.Contains(str, man) && !strings.Contains(str, women) {
-				log.Println(str)
-				log.Println("man:" + man)
-				log.Println("woman:" + women)
-				log.Print("男女比率の選挙結果が正しくありません at GET /")
+				postMessage(str)
+				postMessage("man:" + man)
+				postMessage("woman:" + women)
+				postMessage("男女比率の選挙結果が正しくありません at GET /")
 				os.Exit(1)
 			}
 		}
@@ -310,19 +309,19 @@ func validateCandidate(voteSet []Vote) {
 				if i == 0 {
 					// 得票数の確認
 					if !strings.Contains(str, strconv.Itoa(cnd.value)) {
-						log.Print("得票数の情報が正しくありません at GET /candidates/:id")
+						postMessage("得票数の情報が正しくありません at GET /candidates/:id")
 						os.Exit(1)
 					}
 				} else if i == 1 {
 					// 政党名の確認
 					if !strings.Contains(str, cndInfo.Party) {
-						log.Print("政党の情報が正しくありません at GET /candidates/:id")
+						postMessage("政党の情報が正しくありません at GET /candidates/:id")
 						os.Exit(1)
 					}
 				} else if i == 2 {
 					// 性別の確認
 					if !strings.Contains(str, cndInfo.Sex) {
-						log.Print("性別の情報が正しくありません at GET /candidates/:id")
+						postMessage("性別の情報が正しくありません at GET /candidates/:id")
 						os.Exit(1)
 					}
 				}
@@ -355,7 +354,7 @@ func validateCandidate(voteSet []Vote) {
 					key3 := keyList[keyList.Len()-2-i].name
 					key4 := keyList[keyList.Len()-3-i].name
 					if !strings.Contains(str, key1) && !strings.Contains(str, key2) && !strings.Contains(str, key3) && !strings.Contains(str, key4) {
-						log.Print("支持者の声が正しくありません at GET /candidates/:id")
+						postMessage("支持者の声が正しくありません at GET /candidates/:id")
 						os.Exit(1)
 					}
 				}
@@ -381,7 +380,7 @@ func validatePoliticalParty(voteSet []Vote) {
 	docVotesTxt := doc.Find("#votes").Text()
 	docVotes, _ := strconv.Atoi(docVotesTxt)
 	if docVotes != votes {
-		log.Print("得票数が正しくありません at GET /political_parties/:name")
+		postMessage("得票数が正しくありません at GET /political_parties/:name")
 		os.Exit(1)
 	}
 
@@ -396,7 +395,7 @@ func validatePoliticalParty(voteSet []Vote) {
 			}
 		}
 		if !flg {
-			log.Print("候補者が正しくありません at GET /political_parties/:name")
+			postMessage("候補者が正しくありません at GET /political_parties/:name")
 			os.Exit(1)
 		}
 	})
@@ -419,7 +418,7 @@ func validatePoliticalParty(voteSet []Vote) {
 			key3 := keyList[keyList.Len()-2-i].name
 			key4 := keyList[keyList.Len()-3-i].name
 			if !strings.Contains(str, key1) && !strings.Contains(str, key2) && !strings.Contains(str, key3) && !strings.Contains(str, key4) {
-				log.Print("支持者の声が正しくありません at GET /political_parties/:name")
+				postMessage("支持者の声が正しくありません at GET /political_parties/:name")
 				os.Exit(1)
 			}
 		}

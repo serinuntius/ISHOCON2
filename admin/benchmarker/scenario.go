@@ -1,13 +1,12 @@
 package main
 
 import (
-	"log"
 	"os"
 	"sync"
 	"time"
 )
 
-func voteScenario(wg *sync.WaitGroup, m *sync.Mutex, finishTime time.Time) bool {
+func voteScenario(m *sync.Mutex, finishTime time.Time) bool {
 	voteSet := setupVotes(50, false)
 	resps := map[bool]int{}
 	resp := true
@@ -16,15 +15,15 @@ func voteScenario(wg *sync.WaitGroup, m *sync.Mutex, finishTime time.Time) bool 
 		resp = postVote(vote)
 		resps[resp]++
 		if resp == false {
-			log.Print("投票に失敗しました at POST /vote")
+			postMessage("投票に失敗しました at POST /vote")
 			os.Exit(1)
 		}
 	}
 
-	return updateScore("POST", resps, wg, m, finishTime)
+	return updateScore("POST", resps, m, finishTime)
 }
 
-func invalidVoteScenario(wg *sync.WaitGroup, m *sync.Mutex, finishTime time.Time) bool {
+func invalidVoteScenario(m *sync.Mutex, finishTime time.Time) bool {
 	voteSet := setupVotes(50, false)
 	resps := map[bool]int{}
 	resp := true
@@ -41,15 +40,15 @@ func invalidVoteScenario(wg *sync.WaitGroup, m *sync.Mutex, finishTime time.Time
 		resp = postVote(vote)
 		resps[resp]++
 		if resp == false {
-			log.Print("投票に失敗しました at POST /vote")
+			postMessage("投票に失敗しました at POST /vote")
 			os.Exit(1)
 		}
 	}
 
-	return updateScore("POST", resps, wg, m, finishTime)
+	return updateScore("POST", resps, m, finishTime)
 }
 
-func indexScenario(wg *sync.WaitGroup, m *sync.Mutex, finishTime time.Time) bool {
+func indexScenario(m *sync.Mutex, finishTime time.Time) bool {
 	resps := map[bool]int{}
 	resp := true
 
@@ -59,10 +58,10 @@ func indexScenario(wg *sync.WaitGroup, m *sync.Mutex, finishTime time.Time) bool
 		resp = getCSS()
 		resps[resp]++
 	}
-	return updateScore("GET", resps, wg, m, finishTime)
+	return updateScore("GET", resps, m, finishTime)
 }
 
-func candidateScenario(wg *sync.WaitGroup, m *sync.Mutex, finishTime time.Time) bool {
+func candidateScenario(m *sync.Mutex, finishTime time.Time) bool {
 	resps := map[bool]int{}
 	resp := true
 
@@ -72,10 +71,10 @@ func candidateScenario(wg *sync.WaitGroup, m *sync.Mutex, finishTime time.Time) 
 		resp = getCSS()
 		resps[resp]++
 	}
-	return updateScore("GET", resps, wg, m, finishTime)
+	return updateScore("GET", resps, m, finishTime)
 }
 
-func politicalPartyScenario(wg *sync.WaitGroup, m *sync.Mutex, finishTime time.Time) bool {
+func politicalPartyScenario(m *sync.Mutex, finishTime time.Time) bool {
 	resps := map[bool]int{}
 	resp := true
 
@@ -85,11 +84,11 @@ func politicalPartyScenario(wg *sync.WaitGroup, m *sync.Mutex, finishTime time.T
 		resp = getCSS()
 		resps[resp]++
 	}
-	return updateScore("GET", resps, wg, m, finishTime)
+	return updateScore("GET", resps, m, finishTime)
 }
 
 // 以下、スコア計算用
-func updateScore(method string, resps map[bool]int, wg *sync.WaitGroup, m *sync.Mutex, finishTime time.Time) (finished bool) {
+func updateScore(method string, resps map[bool]int, m *sync.Mutex, finishTime time.Time) (isContinue bool) {
 	m.Lock()
 	defer m.Unlock()
 	if method == "GET" {
@@ -101,10 +100,9 @@ func updateScore(method string, resps map[bool]int, wg *sync.WaitGroup, m *sync.
 	totalResp[true] = totalResp[true] + resps[true]
 	totalResp[false] = totalResp[false] + resps[false]
 	if time.Now().After(finishTime) {
-		finished = true
-		wg.Done()
+		isContinue = false
 	} else {
-		finished = false
+		isContinue = true
 	}
-	return finished
+	return isContinue
 }
